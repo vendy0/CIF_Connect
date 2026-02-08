@@ -1,3 +1,4 @@
 venv/*
-
+mon_env
+c_con_env
 .env
