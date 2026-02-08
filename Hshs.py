@@ -47,10 +47,32 @@ def main(page: ft.Page):
 				message_retour.value = "✅ Connexion réussie !"
 				message_retour.color = "blue"
 				page.controls.clear()
-				
+
+				# 1. Le conteneur des messages (vide au début)
+				chat_messages = ft.ListView(
+					expand=True,  # Prend toute la place disponible
+					spacing=10,  # Espace entre les messages
+					auto_scroll=True,  # Descend tout seul quand un message arrive
+				)
+
+				# 2. La barre d'envoi (en bas)
+				nouveau_message = ft.TextField(
+					hint_text="Écrire un message anonyme...",
+					expand=True,  # S'étire pour prendre la largeur
+				)
+
+				barre_envoi = ft.Row(
+					controls=[
+						nouveau_message,
+						ft.IconButton(icon="send"),
+					]
+				)
+
 				# 2. On ajoute le message de bienvenue ou l'interface de chat
 				page.add(ft.Text("Bienvenue sur CIF Connect !", size=30, color="blue"))
-				
+				page.add(
+					nouveau_message, chat_messages, barre_envoi
+				)
 				# 3. On rafraîchit
 				page.update()
 			else:
