@@ -4,25 +4,44 @@ import time
 
 def LoginView(page: ft.Page):
 	def login_click(e):
-		if not email_input.value or not password_input.value:
-			email_input.error_text = "Veuillez remplir tous les champs"
-			password_input.error_text = "Veuillez remplir tous les champs"
-			page.update()
+		email = email_input.value.strip()
+		mdp = password_input.value
+		if not email:
+			email_input.error = "Veuillez remplir tous les champs"
 		else:
+			email_input.error = None
+			email_input.update()
+		if not mdp:
+			password_input.error = "Veuillez remplir tous les champs"
+		else:
+			password_input.error = None
+			password_input.update()
+		page.update()
+		if mdp and email:
+			if email != "aaaa":
+				email_input.error = "Email incorrect !"
+			elif mdp != "1234":
+				email_input.error = None
+				email_input.update()
+				password_input.error = "Mot de passe incorrect !"
+				page.go("/login")
+
 			# Simulation de chargement
-			login_btn.content = ft.ProgressRing(width=20, height=20, stroke_width=2, color="white")
-			login_btn.disabled = True
-			page.update()
+			else:
+				login_btn.content = ft.ProgressRing(
+					width=20, height=20, stroke_width=2, color="white"
+				)
+				login_btn.disabled = True
+				login_btn.icon = None
+				page.update()
 
-			time.sleep(1)  # Juste pour l'effet visuel
+				# time.sleep(10)  # Juste pour l'effet visuel
 
-			# --- ICI : Connecter plus tard à ta BDD (gestion_bdd.db) ---
-			# Pour l'instant, on stocke le pseudo dans la session et on navigue
-			# On prend la partie avant le @ comme pseudo temporaire
-			pseudo = email_input.value.split("@")[0]
-			page.session.set("user_name", pseudo)
-
-			page.go("/chat")
+				# --- ICI : Connecter plus tard à ta BDD (gestion_bdd.db) ---
+				# Pour l'instant, on stocke le pseudo dans la session et on navigue
+				# On prend la partie avant le @ comme pseudo temporaire
+				page.go("/rooms")
+		page.update()
 
 	# Logo
 	logo = ft.Image(
@@ -34,10 +53,11 @@ def LoginView(page: ft.Page):
 
 	# Champs de saisie
 	email_input = ft.TextField(
-		label="Email institutionnel",
+		label="Email personnel",
 		prefix_icon=ft.Icons.EMAIL,
 		border_radius=10,
 		keyboard_type=ft.KeyboardType.EMAIL,
+		on_submit=lambda e: password_input.focus(),
 	)
 
 	password_input = ft.TextField(
