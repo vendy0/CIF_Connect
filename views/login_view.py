@@ -1,0 +1,96 @@
+import flet as ft
+import time
+
+
+def LoginView(page: ft.Page):
+	def login_click(e):
+		if not email_input.value or not password_input.value:
+			email_input.error_text = "Veuillez remplir tous les champs"
+			password_input.error_text = "Veuillez remplir tous les champs"
+			page.update()
+		else:
+			# Simulation de chargement
+			login_btn.content = ft.ProgressRing(width=20, height=20, stroke_width=2, color="white")
+			login_btn.disabled = True
+			page.update()
+
+			time.sleep(1)  # Juste pour l'effet visuel
+
+			# --- ICI : Connecter plus tard à ta BDD (gestion_bdd.db) ---
+			# Pour l'instant, on stocke le pseudo dans la session et on navigue
+			# On prend la partie avant le @ comme pseudo temporaire
+			pseudo = email_input.value.split("@")[0]
+			page.session.set("user_name", pseudo)
+
+			page.go("/chat")
+
+	# Logo
+	logo = ft.Image(
+		src="logo.png",  # Flet cherche automatiquement dans 'assets'
+		width=120,
+		height=120,
+		fit=ft.BoxFit.CONTAIN,
+	)
+
+	# Champs de saisie
+	email_input = ft.TextField(
+		label="Email institutionnel",
+		prefix_icon=ft.Icons.EMAIL,
+		border_radius=10,
+		keyboard_type=ft.KeyboardType.EMAIL,
+	)
+
+	password_input = ft.TextField(
+		label="Mot de passe",
+		prefix_icon=ft.Icons.LOCK,
+		password=True,
+		can_reveal_password=True,
+		border_radius=10,
+		on_submit=login_click,  # Permet de valider avec "Entrée"
+	)
+
+	login_btn = ft.ElevatedButton(
+		content="Se connecter",
+		icon=ft.Icons.LOGIN,
+		width=200,
+		height=50,
+		style=ft.ButtonStyle(
+			shape=ft.RoundedRectangleBorder(radius=10),
+			bgcolor=ft.Colors.BLUE_600,
+			color="white",
+		),
+		on_click=login_click,
+	)
+
+	# Structure de la page (View)
+	return ft.View(
+		route="/",
+		controls=[
+			ft.Container(
+				content=ft.Column(
+					controls=[
+						ft.Container(height=20),  # Espace vide
+						logo,
+						ft.Text(
+							"CIF Connect",
+							size=30,
+							weight=ft.FontWeight.BOLD,
+							color=ft.Colors.BLUE_GREY_900,
+						),
+						ft.Text("Chat anonyme du campus", size=16, color=ft.Colors.GREY_500),
+						ft.Container(height=30),
+						email_input,
+						ft.Container(height=10),
+						password_input,
+						ft.Container(height=20),
+						login_btn,
+					],
+					horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+				),
+				padding=30,
+				alignment=ft.Alignment.CENTER,
+			)
+		],
+		vertical_alignment=ft.MainAxisAlignment.CENTER,
+		horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+	)
