@@ -9,7 +9,6 @@ def RoomsView(page: ft.Page):
 
     def join_room(e):
         # On pourrait stocker l'ID du salon en session
-        page.session.set("current_room_id", e.control.data)
         page.go("/chat")
 
     room_list = ft.ListView(expand=True, spacing=10)

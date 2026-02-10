@@ -6,6 +6,8 @@ from rooms_view import RoomsView
 from create_room_view import CreateRoomView
 from utils import generer_pseudo
 
+pseudo = ""
+
 
 def main(page: ft.Page):
 	global pseudo
@@ -27,6 +29,7 @@ def main(page: ft.Page):
 	# page.window.width = 400
 	# page.window.height = 700
 	def route_change(route):
+		global pseudo
 		page.views.clear()
 		if page.route == "/login":
 			page.views.append(LoginView(page))

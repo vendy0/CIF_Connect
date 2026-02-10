@@ -21,7 +21,7 @@ class ChatMessage(ft.Row):
 		self.user_initials = get_initials(self.message.user)
 		self.avatar_color = get_avatar_color(self.message.user, COLORS_LOOKUP)
 		self.controls = [
-			ft.CircleAvatar(content=ft.Text(get_initials(message.user))),
+			ft.CircleAvatar(content=ft.Text(get_initials(message.user)), bgcolor=self.avatar_color),
 			ft.GestureDetector(
 				on_long_press_start=lambda _: self.show_options(),  # Pour mobile
 				content=ft.Container(
@@ -33,7 +33,7 @@ class ChatMessage(ft.Row):
 						spacing=2,
 					),
 					padding=10,
-					bgcolor=ft.Colors.SURFACE_VARIANT,
+					bgcolor=ft.Colors.SURFACE_CONTAINER,
 					border_radius=15,
 				),
 			),
@@ -43,17 +43,18 @@ class ChatMessage(ft.Row):
 				items=[
 					ft.PopupMenuItem(
 						icon=ft.Icons.FAVORITE_BORDER,
-						text="Liker",
+						content="Liker",
 						on_click=lambda _: on_react(message),
 					),
 					ft.PopupMenuItem(
 						icon=ft.Icons.REPORT_GMAILERRORRED,
-						text="Signaler",
+						content="Signaler",
 						on_click=lambda _: on_report(message),
 					),
 				],
 			),
 		]
+
 
 def ChatView(page: ft.Page, current_user):
 	# Simuler un chargement
@@ -68,12 +69,13 @@ def ChatView(page: ft.Page, current_user):
 	container = ft.Container(
 		content=loading_screen,
 		expand=True,
-		alignment=ft.Alignment.center,
+		alignment=ft.Alignment.CENTER,
 	)
 
 	# Fonction pour "charger" réellement
 	def load_history():
 		import time
+
 		time.sleep(1.5)  # Simule le réseau
 		container.content = chat_list
 		page.update()
