@@ -1,10 +1,7 @@
-from dataclasses import dataclass
-from generate_pseudo import generer
-from untitled import get_initials
 import flet as ft
-
-pseudo = generer()
-
+from dataclasses import dataclass
+# Assurez-vous que utils.py est dans le même dossier
+from utils import generer_pseudo, get_initials, get_avatar_color, get_colors
 
 @dataclass
 class Message:
@@ -12,73 +9,77 @@ class Message:
     text: str
     message_type: str
 
+# Chargement des couleurs
+COLORS_LOOKUP = get_colors()
 
-@ft.control
 class ChatMessage(ft.Row):
     def __init__(self, message: Message):
         super().__init__()
         self.message = message
         self.vertical_alignment = ft.CrossAxisAlignment.START
+        
+        # On recalcule les initiales/couleurs à la volée pour l'affichage
+        # (Plus sûr que de les stocker en session)
+        self.user_initials = get_initials(self.message.user)
+        self.avatar_color = get_avatar_color(self.message.user, COLORS_LOOKUP)
+
         self.controls = [
             ft.CircleAvatar(
-                content=ft.Text(get_initials(pseudo)),
+                content=ft.Text(self.user_initials),
                 color=ft.Colors.WHITE,
-                bgcolor=self.get_avatar_color(self.message.user_name),
+                bgcolor=self.avatar_color,
             ),
             ft.Column(
                 tight=True,
                 spacing=5,
                 controls=[
-                    ft.Text(self.message.user_name, weight=ft.FontWeight.BOLD),
+                    ft.Text(self.message.user, weight=ft.FontWeight.BOLD),
                     ft.Text(self.message.text, selectable=True),
                 ],
             ),
         ]
 
-    # def get_initials(self, user_name: str):
-    # 	if user_name:
-    # 		return user_name[:1].capitalize()
-    # 	else:
-    # 		return "Unknown"  # or any default value you prefer
-
-    def get_avatar_color(self, user_name: str):
-        colors_lookup = [
-            ft.Colors.AMBER,
-            ft.Colors.BLUE,
-            ft.Colors.BROWN,
-            ft.Colors.CYAN,
-            ft.Colors.GREEN,
-            ft.Colors.INDIGO,
-            ft.Colors.LIME,
-            ft.Colors.ORANGE,
-            ft.Colors.PINK,
-            ft.Colors.PURPLE,
-            ft.Colors.RED,
-            ft.Colors.TEAL,
-            ft.Colors.YELLOW,
-        ]
-        return colors_lookup[hash(user_name) % len(colors_lookup)]
-
-
 def main(page: ft.Page):
     page.horizontal_alignment = ft.CrossAxisAlignment.STRETCH
     page.title = "CIF Connect"
-    page.auto_scroll = True
 
+    # --- Gestion des Préférences (Via Session au lieu de ClientStorage) ---
+    def get_user_preferences():
+        # page.session fonctionne comme un dictionnaire temporaire
+        if not page.session.contains_key("user_name"):
+            pseudo = generer_pseudo()
+            page.session.set("user_name", pseudo)
+        
+        return page.session.get("user_name")
+
+    # Récupération du pseudo actuel
+    current_user = get_user_preferences()
+
+    # --- UI ---
+    chat = ft.ListView(expand=True, spacing=10, auto_scroll=True)
+    
     def send_click(e):
         if not new_message.value:
-            new_message.error = "Il n'y a rien à envoyer !"
+            new_message.error_text = "Il n'y a rien à envoyer !"
+            new_message.update()
             return
+        
+        new_message.error_text = None
+        
+        # On récupère le nom depuis la session
+        user_name = page.session.get("user_name")
+
         page.pubsub.send_all(
             Message(
-                user=page.session.store.get("user_name"),
+                user=user_name,
                 text=new_message.value,
                 message_type="chat_message",
             )
         )
         new_message.value = ""
+        new_message.focus()
+        page.update()
 
-    chat = ft.ListView(expand=True, spacing=10, auto_scroll=True)
     new_message = ft.TextField(
         autofocus=True,
         shift_enter=True,
@@ -87,56 +88,50 @@ def main(page: ft.Page):
         expand=True,
         min_lines=1,
         on_submit=send_click,
-        # on_tap_outside=lambda e: (setattr(new_message, "unfocus", True), page.update()),
     )
 
+    # --- PubSub ---
     def on_message(message: Message):
         if message.message_type == "chat_message":
-            chat.controls.append(ft.Text(f"{message.user}: {message.text}"))
+            m = ChatMessage(message)
+            chat.controls.append(m)
         elif message.message_type == "login_message":
             chat.controls.append(
-                ft.Text(message.text, italic=True, color=ft.Colors.ORANGE_500, size=12)
+                ft.Text(message.text, italic=True, color=ft.Colors.ORANGE_500, size=12, text_align=ft.TextAlign.CENTER)
             )
-        page.update()
-
-    def lose_focus(e):
-        new_message.unfocus()
         page.update()
 
     page.pubsub.subscribe(on_message)
 
     def join_click(e):
-        # if not user_name.value:
-        # 	user_name.error = "Name cannot be blank!"
-        # 	user_name.update()
-        # else:
-        page.session.store.set("user_name", pseudo)
-        page.pop_dialog()
+        welcome_dialog.open = False
+        page.update()
+        
+        user_name = page.session.get("user_name")
         page.pubsub.send_all(
             Message(
-                user=pseudo,
-                text=f"{pseudo} a rejoint le chat.",
+                user=user_name,
+                text=f"{user_name} a rejoint le chat.",
                 message_type="login_message",
             )
         )
 
-    # user_name = ft.TextField(label="Enter your name")
-
-    page.show_dialog(
-        ft.AlertDialog(
-            open=True,
-            modal=True,
-            title=ft.Text(f"Welcome {pseudo} !"),
-            # content=ft.Column([user_name], tight=True),
-            actions=[ft.Button(content="Ok", on_click=join_click)],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
+    # Note : Sur les vieilles versions, page.overlay n'existe pas toujours,
+    # on utilise donc page.dialog pour être sûr.
+    welcome_dialog = ft.AlertDialog(
+        open=True,
+        modal=True,
+        title=ft.Text(f"Bienvenue {current_user} !"),
+        content=ft.Text("Votre identité est anonymisée (Adjectif + Animal)."),
+        actions=[ft.Button(text="Rejoindre", on_click=join_click)],
+        actions_alignment=ft.MainAxisAlignment.END,
     )
+
+    page.dialog = welcome_dialog
+    
     page.add(
         ft.Container(
             content=chat,
-            # border=ft.border.all(1, ft.Colors.OUTLINE),
-            # border_radius=5,
             padding=10,
             expand=True,
         ),
@@ -152,5 +147,9 @@ def main(page: ft.Page):
         ),
     )
 
+# Utilisation standard moderne :
+ft.app(target=main)
 
-ft.run(main)
+# Si votre version vous oblige VRAIMENT à utiliser run, décommentez la ligne ci-dessous 
+# et commentez la ligne ft.app ci-dessus :
+# ft.run(target=main) 
