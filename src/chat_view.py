@@ -51,6 +51,11 @@ class ChatMessage(ft.Row):
 						content="Signaler",
 						on_click=lambda _: on_report(message),
 					),
+					ft.PopupMenuItem(
+						icon=ft.Icons.REPLY_SHARP,
+						content="Répondre",
+						on_click=lambda _: on_response(message),
+					),
 				],
 			),
 		]
@@ -135,7 +140,7 @@ def ChatView(page: ft.Page, current_user):
 			ft.IconButton(
 				ft.Icons.LOGOUT,
 				tooltip="Déconnexion",
-				on_click=lambda e: page.go("/login"),
+				on_click=lambda e: page.go("/rooms"),
 			)
 		],
 	)

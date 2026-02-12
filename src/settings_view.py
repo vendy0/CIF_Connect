@@ -98,7 +98,7 @@ def SettingsView(page: ft.Page, actuel_pseudo):
 			),
 			ft.Divider(),
 			ft.TextButton(
-				"Déconnexion", icon=ft.Icons.LOGOUT, on_click=lambda _: page.go("/login")
+				"Déconnexion", icon=ft.Icons.LOgoUT, on_click=lambda _: page.go("/login")
 			),
 		],
 	)

@@ -4,7 +4,7 @@ from chat_view import ChatView
 from settings_view import SettingsView
 from rooms_view import RoomsView
 from create_room_view import CreateRoomView
-from utils import generer_pseudo
+from utils import generer_pseudo, rooms, Room
 
 pseudo = ""
 
@@ -34,18 +34,20 @@ def main(page: ft.Page):
 		if page.route == "/login":
 			page.views.append(LoginView(page))
 		elif page.route == "/rooms":
-			page.views.append(RoomsView(page))
+			page.views.append(RoomsView(page, rooms))
 		elif page.route == "/chat":
 			page.views.append(ChatView(page, pseudo))
 		elif page.route == "/settings":
 			cont, ps = SettingsView(page, pseudo)
 			pseudo = fixer_pseudo(ps, pseudo)
 			page.views.append(cont)
-		elif page.route == "/create_room":
-			page.views.append(CreateRoomView(page))
+		elif page.route == "/new_room":
+			page_returned = CreateRoomView(page)
+			page.views.append(page_returned)
 		page.update()
 
 	def view_pop(view):
+		print(v.route for v in views.route)
 		page.views.pop()
 		top_view = page.views[-1]
 		page.go(top_view.route)

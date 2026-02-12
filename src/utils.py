@@ -4,8 +4,37 @@ import json
 from pathlib import Path
 import flet as ft
 
+page = ft.Page
+
 
 # Assurez-vous que les fichiers json sont dans le même dossier ou ajustez le cheminimport json
+class Room:
+	def __init__(self, page, room_id, name, desc, icon=ft.Icons.CHAT_BUBBLE_ROUNDED, code="ab12"):
+		self.page = page
+		self.id: int = room_id
+		self.name: str = name
+		self.desc: str = desc
+		self.icon: ft.Icons = icon
+		self.code: str = code
+
+		self.controls = ft.ListTile(
+			leading=ft.Icon(icon=self.icon, color=ft.Colors.BLUE_600),
+			title=ft.Text(self.name, weight="bold"),
+			subtitle=ft.Text(self.desc),
+			trailing=ft.Icon(ft.Icons.CHEVRON_RIGHT),
+			data=self.id,
+			on_click=self.join_room,
+		)
+
+	def join_room(self, e):
+		# On pourrait stocker l'ID du salon en session
+		self.page.go("/chat")
+
+
+room_1 = Room(page, 1, "Salon Général", "Discussion libre pour tous", ft.Icons.PUBLIC)
+room_2 = Room(page, 2, "Projet Python", "Groupe de travail dév", ft.Icons.CODE)
+
+rooms = [room_1, room_2]
 
 
 def load_json_file(filename):
