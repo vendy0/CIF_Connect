@@ -3,6 +3,16 @@ import random
 import json
 from pathlib import Path
 import flet as ft
+import secrets
+import string
+
+
+def generate_secure_code():
+	caracteres = string.ascii_letters + string.digits
+	return "".join(secrets.choice(caracteres) for _ in range(4))
+
+
+print(generate_secure_code())
 
 page = ft.Page
 
@@ -20,7 +30,7 @@ class Room:
 		self.controls = ft.ListTile(
 			leading=ft.Icon(icon=self.icon, color=ft.Colors.BLUE_600),
 			title=ft.Text(self.name, weight="bold"),
-			subtitle=ft.Text(self.desc),
+			subtitle=ft.Text(self.code),
 			trailing=ft.Icon(ft.Icons.CHEVRON_RIGHT),
 			data=self.id,
 			on_click=self.join_room,
@@ -31,8 +41,12 @@ class Room:
 		self.page.go("/chat")
 
 
-room_1 = Room(page, 1, "Salon Général", "Discussion libre pour tous", ft.Icons.PUBLIC)
-room_2 = Room(page, 2, "Projet Python", "Groupe de travail dév", ft.Icons.CODE)
+room_1 = Room(
+	page, 1, "Salon Général", "Discussion libre pour tous", ft.Icons.PUBLIC, generate_secure_code()
+)
+room_2 = Room(
+	page, 2, "Projet Python", "Groupe de travail dév", ft.Icons.CODE, generate_secure_code()
+)
 
 rooms = [room_1, room_2]
 

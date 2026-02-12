@@ -1,5 +1,5 @@
 import flet as ft
-from utils import Room, rooms
+from utils import Room, rooms, generate_secure_code
 
 
 def CreateRoomView(page: ft.Page):
@@ -18,7 +18,7 @@ def CreateRoomView(page: ft.Page):
 			page.update()
 		if name and desc:
 			room_id = len(rooms)
-			room = Room(page, room_id, name, desc)
+			room = Room(page, room_id, name, desc, generate_secure_code())
 			rooms.append(room)
 			page.go("/rooms")
 
