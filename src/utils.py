@@ -37,18 +37,9 @@ class Room:
 		)
 
 	def join_room(self, e):
-		# On pourrait stocker l'ID du salon en session
-		self.page.go("/chat")
+		self.page.push_route(route="/chat")
 
-
-room_1 = Room(
-	page, 1, "Salon Général", "Discussion libre pour tous", ft.Icons.PUBLIC, generate_secure_code()
-)
-room_2 = Room(
-	page, 2, "Projet Python", "Groupe de travail dév", ft.Icons.CODE, generate_secure_code()
-)
-
-rooms = [room_1, room_2]
+rooms = []
 
 
 def load_json_file(filename):

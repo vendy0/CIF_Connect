@@ -24,7 +24,7 @@ def LoginView(page: ft.Page):
 				email_input.error = None
 				email_input.update()
 				password_input.error = "Mot de passe incorrect !"
-				page.go("/login")
+				page.push_route("/login")
 
 			# Simulation de chargement
 			else:
@@ -40,12 +40,12 @@ def LoginView(page: ft.Page):
 				# --- ICI : Connecter plus tard à ta BDD (gestion_bdd.db) ---
 				# Pour l'instant, on stocke le pseudo dans la session et on navigue
 				# On prend la partie avant le @ comme pseudo temporaire
-				page.go("/rooms")
+				page.push_route("/rooms")
 		page.update()
 
-	# Logo
-	logo = ft.Image(
-		src="logo.png",  # Flet cherche automatiquement dans 'assets'
+	# Lopush_route
+	lopush_route = ft.Image(
+		src="lopush_route.png",  # Flet cherche automatiquement dans 'assets'
 		width=120,
 		height=120,
 		fit=ft.BoxFit.CONTAIN,
@@ -90,7 +90,7 @@ def LoginView(page: ft.Page):
 				content=ft.Column(
 					controls=[
 						ft.Container(height=20),  # Espace vide
-						logo,
+						lopush_route,
 						ft.Text(
 							"CIF Connect",
 							size=30,

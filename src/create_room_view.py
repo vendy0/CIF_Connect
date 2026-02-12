@@ -4,7 +4,16 @@ from utils import Room, rooms, generate_secure_code
 
 def CreateRoomView(page: ft.Page):
 	def verifier_code(e):
-		pass
+		code = code_input.value
+		if not code:
+			code_input.error = "Tous les champs sont obligatoires !"
+			page.update()
+		else:
+			if code in [room.code for room in rooms]:
+				page.push_route("/chat")
+			else:
+				code_input.error = "Salon introuvable !"
+				page.update()
 
 	def creer_room(e):
 		name = room_name_input.value
@@ -20,7 +29,7 @@ def CreateRoomView(page: ft.Page):
 			room_id = len(rooms)
 			room = Room(page, room_id, name, desc, generate_secure_code())
 			rooms.append(room)
-			page.go("/rooms")
+			page.push_route("/rooms")
 
 	room_name_input = ft.TextField(label="Nom de salon")
 
@@ -28,6 +37,14 @@ def CreateRoomView(page: ft.Page):
 		label="Description",
 		multiline=True,
 		on_submit=creer_room,
+	)
+
+	code_input = (
+		ft.TextField(
+			label="Code d'invitation",
+			hint_text="Ex: AX-77-Z",
+			on_submit=verifier_code,
+		)
 	)
 
 	return ft.View(
@@ -60,11 +77,7 @@ def CreateRoomView(page: ft.Page):
 									padding=20,
 									content=ft.Column(
 										[
-											ft.TextField(
-												label="Code d'invitation",
-												hint_text="Ex: AX-77-Z",
-												on_submit=verifier_code,
-											),
+											code_input,
 											ft.ElevatedButton(
 												"Entrer dans le salon",
 												icon=ft.Icons.LOGIN,
