@@ -3,9 +3,43 @@ import random
 import json
 from pathlib import Path
 import flet as ft
+import secrets
+import string
+
+
+def generate_secure_code():
+	caracteres = string.ascii_letters + string.digits
+	return "".join(secrets.choice(caracteres) for _ in range(4))
+
+
+print(generate_secure_code())
+
+page = ft.Page
 
 
 # Assurez-vous que les fichiers json sont dans le même dossier ou ajustez le cheminimport json
+class Room:
+	def __init__(self, page, room_id, name, desc, icon=ft.Icons.CHAT_BUBBLE_ROUNDED, code="ab12"):
+		self.page = page
+		self.id: int = room_id
+		self.name: str = name
+		self.desc: str = desc
+		self.icon: ft.Icons = icon
+		self.code: str = code
+
+		self.controls = ft.ListTile(
+			leading=ft.Icon(icon=self.icon, color=ft.Colors.BLUE_600),
+			title=ft.Text(self.name, weight="bold"),
+			subtitle=ft.Text(self.code),
+			trailing=ft.Icon(ft.Icons.CHEVRON_RIGHT),
+			data=self.id,
+			on_click=self.join_room,
+		)
+
+	def join_room(self, e):
+		self.page.push_route(route="/chat")
+
+rooms = []
 
 
 def load_json_file(filename):

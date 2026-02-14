@@ -2,6 +2,15 @@ import flet as ft
 from utils import generer_pseudo
 
 
+def view_pop(page: ft.Page):
+	if len(page.views) > 1:
+		page.views.pop()
+		top_view = page.views[-1]
+		page.push_route(top_view.route)
+	else:
+		print("Impossible de revenir en arrière : une seule view restante.")
+
+
 def SettingsView(page: ft.Page, actuel_pseudo):
 	# On déclare 'pseudo' comme global au début pour pouvoir le modifier
 	global pseudo
@@ -98,8 +107,9 @@ def SettingsView(page: ft.Page, actuel_pseudo):
 			),
 			ft.Divider(),
 			ft.TextButton(
-				"Déconnexion", icon=ft.Icons.LOGOUT, on_click=lambda _: page.go("/login")
+				"Déconnexion", icon=ft.Icons.LOGOUT, on_click=lambda _: page.push_route("/login")
 			),
+			ft.TextButton("Retour", icon=ft.Icons.ARROW_BACK, on_click=view_pop(page)),
 		],
 	)
 
