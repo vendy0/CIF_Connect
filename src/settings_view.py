@@ -13,6 +13,14 @@ from flet_storage import FletStorage
 
 
 async def SettingsView(page: ft.Page):
+    async def view_pop(view):
+        if len(page.views) > 1:
+            page.views.pop()
+            previous = page.views[-1]
+            await page.push_route(previous.route)
+        else:
+            print("Aucune vue précédente.")
+
     storage = FletStorage("cif_connect_app")
     await storage.set("pseudo", page.session.store.get("pseudo"))
 
@@ -20,7 +28,7 @@ async def SettingsView(page: ft.Page):
     async def back(e):
         pseudo = await storage.get("pseudo")
         page.session.store.set("pseudo", pseudo)
-        await page.push_route("/rooms")
+        await page.go_back()
         # page.views.pop()
 
     async def go_login(e):
@@ -117,6 +125,6 @@ async def SettingsView(page: ft.Page):
             ),
             ft.Divider(),
             ft.TextButton("Déconnexion", icon=ft.Icons.LOGOUT, on_click=go_login),
-            ft.TextButton("Retour", icon=ft.Icons.ARROW_BACK, on_click=back),
+            ft.TextButton("Retour", icon=ft.Icons.ARROW_BACK, on_click=view_pop),
         ],
     )

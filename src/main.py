@@ -43,8 +43,6 @@ async def main(page: ft.Page):
 
     # ---- ROUTE CHANGE ----
     async def route_change():  # e : ft.RouteChangeEvent):
-        page.views.clear()
-
         # e.route (ou page.route) contient la route active
         if page.route == "/login":
             page.views.append(await LoginView(page))
@@ -61,12 +59,13 @@ async def main(page: ft.Page):
         page.update()
 
     # ---- BACK NAVIGATION ----
-    async def view_pop(e):
-        if e.view is not None:
-            print("View pop:", e.view)
-            page.views.remove(e.view)
-            top_view = page.views[-1]
-            await page.push_route(top_view.route)
+    async def view_pop(view):
+        if len(page.views) > 1:
+            page.views.pop()
+            previous = page.views[-1]
+            await page.push_route(previous.route)
+        else:
+            print("Aucune vue précédente.")
 
     page.on_route_change = route_change
     page.on_view_pop = view_pop
