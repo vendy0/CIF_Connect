@@ -12,6 +12,7 @@ fastapi==0.128.2
 flet==0.80.5
 flet-cli==0.80.5
 flet-desktop==0.80.5
+flet-storage==1.0.0
 flet-web==0.80.5
 greenlet==3.3.1
 h11==0.16.0

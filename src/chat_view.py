@@ -14,7 +14,6 @@ class Message:
 
 # Couleurs / utilitaires
 COLORS_LOOKUP = get_colors()
-pseudo = generer_pseudo()  # fallback si pas d'utilisateur fourni
 
 
 class ChatMessage(ft.Row):
@@ -109,7 +108,7 @@ class ChatMessage(ft.Row):
 
 
 # Vue principale du chat
-async def ChatView(page: ft.Page, current_user):
+async def ChatView(page: ft.Page):
 	# Loading screen
 	loading_screen = ft.Column(
 		[
@@ -140,17 +139,13 @@ async def ChatView(page: ft.Page, current_user):
 		container.content = chat_list
 		page.update()
 
-	# Fallback si pas d'utilisateur fourni
-	if not current_user:
-		current_user = pseudo
-
 	def send_click(e):
 		if not new_message.value:
 			return
 
 		page.pubsub.send_all(
 			Message(
-				user=current_user,
+				user=page.session.store.get("pseudo"),
 				text=new_message.value.strip(),
 				message_type="chat_message",
 			)
