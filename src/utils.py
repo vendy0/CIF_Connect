@@ -5,16 +5,12 @@ from pathlib import Path
 import flet as ft
 import secrets
 import string
+from asyncio import create_task
 
 
 def generate_secure_code():
 	caracteres = string.ascii_letters + string.digits
 	return "".join(secrets.choice(caracteres) for _ in range(4))
-
-
-print(generate_secure_code())
-
-page = ft.Page
 
 
 # Assurez-vous que les fichiers json sont dans le même dossier ou ajustez le cheminimport json
@@ -37,7 +33,8 @@ class Room:
 		)
 
 	def join_room(self, e):
-		self.page.push_route(route="/chat")
+		create_task(self.page.push_route(route="/chat"))
+
 
 rooms = []
 
@@ -157,3 +154,10 @@ if __name__ == "__main__":
 	# print(Path("./src/chat.py").exists())
 	# load_json_file("ft_cols.json")
 	get_avatar_color("SansDetermin108", get_colors())
+
+	async def view_pop(e):
+		if e.view is not None:
+			print("View pop:", e.view)
+			page.views.remove(e.view)
+			top_view = page.views[-1]
+			await page.push_route(top_view.route)

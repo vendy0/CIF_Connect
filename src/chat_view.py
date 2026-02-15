@@ -1,6 +1,7 @@
 import flet as ft
 from dataclasses import dataclass
 from utils import generer_pseudo, get_initials, get_avatar_color, get_colors
+import asyncio
 
 
 # --- Modèle simple pour un message
@@ -79,20 +80,19 @@ class ChatMessage(ft.Row):
 	def _get_event_page(self, e):
 		# récupération robuste de la page depuis l'événement
 		return getattr(e, "page", None) or getattr(getattr(e, "control", None), "page", None)
-	
-	def open_menu(self, e):
-	    print(f"[ChatMessage] open_menu appelé pour : {self.message.text!r}")
-	
-	    page = getattr(e, "page", None) or getattr(e.control, "page", None)
-	    if not page:
-	        return
-	
-	    if self.bottom_sheet not in page.overlay:
-	        page.overlay.append(self.bottom_sheet)
-	
-	    self.bottom_sheet.open = True
-	    page.update()
 
+	def open_menu(self, e):
+		print(f"[ChatMessage] open_menu appelé pour : {self.message.text!r}")
+
+		page = getattr(e, "page", None) or getattr(e.control, "page", None)
+		if not page:
+			return
+
+		if self.bottom_sheet not in page.overlay:
+			page.overlay.append(self.bottom_sheet)
+
+		self.bottom_sheet.open = True
+		page.update()
 
 	def close_sheet_and_act(self, e, action):
 		page = self._get_event_page(e)
@@ -109,7 +109,7 @@ class ChatMessage(ft.Row):
 
 
 # Vue principale du chat
-def ChatView(page: ft.Page, current_user):
+async def ChatView(page: ft.Page, current_user):
 	# Loading screen
 	loading_screen = ft.Column(
 		[
@@ -133,10 +133,10 @@ def ChatView(page: ft.Page, current_user):
 	)
 
 	# Fonction pour "charger" l'historique (simulée)
-	def load_history():
+	async def load_history():
 		import time
 
-		time.sleep(1.0)
+		await time.sleep(1.0)
 		container.content = chat_list
 		page.update()
 
@@ -169,6 +169,11 @@ def ChatView(page: ft.Page, current_user):
 		on_submit=send_click,
 	)
 
+	async def go_to_rooms(e):
+		await page.push_route(
+			"/rooms"
+		)  # Note: push_route est souvent remplacé par go_async dans les versions récentes
+
 	# Réception d'un message via pubsub
 	def on_message(message: Message):
 		if message.message_type == "chat_message":
@@ -186,7 +191,7 @@ def ChatView(page: ft.Page, current_user):
 		center_title=True,
 		bgcolor=ft.Colors.DEEP_PURPLE_700,
 		actions=[
-			ft.IconButton(ft.Icons.LOGOUT, tooltip="Retour", on_click=lambda e: page.push_route("/rooms"))
+			ft.IconButton(ft.Icons.LOGOUT, tooltip="Retour", on_click= go_to_rooms)
 		],
 	)
 

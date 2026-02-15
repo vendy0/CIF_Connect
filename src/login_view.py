@@ -2,8 +2,8 @@ import flet as ft
 import time
 
 
-def LoginView(page: ft.Page):
-	def login_click(e):
+async def LoginView(page: ft.Page):
+	async def login_click(e):
 		email = email_input.value.strip()
 		mdp = password_input.value
 		if not email:
@@ -24,7 +24,7 @@ def LoginView(page: ft.Page):
 				email_input.error = None
 				email_input.update()
 				password_input.error = "Mot de passe incorrect !"
-				page.push_route("/login")
+				await page.push_route("/login")
 
 			# Simulation de chargement
 			else:
@@ -40,7 +40,7 @@ def LoginView(page: ft.Page):
 				# --- ICI : Connecter plus tard à ta BDD (gestion_bdd.db) ---
 				# Pour l'instant, on stocke le pseudo dans la session et on navigue
 				# On prend la partie avant le @ comme pseudo temporaire
-				page.push_route("/rooms")
+				await page.push_route("/rooms")
 		page.update()
 
 	# Lopush_route

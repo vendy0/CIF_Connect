@@ -2,20 +2,23 @@ import flet as ft
 from utils import Room, rooms, generate_secure_code
 
 
-def CreateRoomView(page: ft.Page):
-	def verifier_code(e):
+async def CreateRoomView(page: ft.Page):
+	async def verifier_code(e):
 		code = code_input.value
 		if not code:
 			code_input.error = "Tous les champs sont obligatoires !"
 			page.update()
 		else:
 			if code in [room.code for room in rooms]:
-				page.push_route("/chat")
+				await page.push_route("/chat")
 			else:
 				code_input.error = "Salon introuvable !"
 				page.update()
 
-	def creer_room(e):
+	async def new_room(e):
+		await page.push_route("/new_room")
+
+	async def creer_room(e):
 		name = room_name_input.value
 		desc = room_description_input.value
 
@@ -27,9 +30,9 @@ def CreateRoomView(page: ft.Page):
 			page.update()
 		if name and desc:
 			room_id = len(rooms)
-			room = Room(page, room_id, name, desc, generate_secure_code())
+			room = Room(page, room_id, name, desc, code =generate_secure_code())
 			rooms.append(room)
-			page.push_route("/rooms")
+			await page.push_route("/rooms")
 
 	room_name_input = ft.TextField(label="Nom de salon")
 
@@ -39,12 +42,10 @@ def CreateRoomView(page: ft.Page):
 		on_submit=creer_room,
 	)
 
-	code_input = (
-		ft.TextField(
-			label="Code d'invitation",
-			hint_text="Ex: AX-77-Z",
-			on_submit=verifier_code,
-		)
+	code_input = ft.TextField(
+		label="Code d'invitation",
+		hint_text="Ex: AX-77-Z",
+		on_submit=verifier_code,
 	)
 
 	return ft.View(
