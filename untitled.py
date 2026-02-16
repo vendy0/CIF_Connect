@@ -2,6 +2,9 @@
 - Page de connexion
 - Boite de dialogue de bienvenue
 - Si y a déjà un salon avec ce nom, on annule
+- Quand qlq'un change de pseudo faut l'avertir que ça se verra dans les rooms créés.
+- Report un user
+- Le jwt à la place des id dans les requetes.
 """
 
 # Un dictionnaire pour tout centraliser
