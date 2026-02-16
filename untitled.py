@@ -1,6 +1,7 @@
 """
 - Page de connexion
 - Boite de dialogue de bienvenue
+- Si y a déjà un salon avec ce nom, on annule
 """
 
 # Un dictionnaire pour tout centraliser
