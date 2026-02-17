@@ -1,8 +1,8 @@
 # database/interactions.py
-from sqlalchemy import select, delete, func
+from sqlalchemy import select, delete, insert, func
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.exc import IntegrityError
-from database.models import User, Room, Message, Reaction
+from database.models import User, Room, Message, Reaction, user_room
 from database.shemas import *
 from fastapi import HTTPException
 
@@ -40,27 +40,76 @@ def get_user_rooms(db: Session, email: str):
 	return user.rooms
 
 
+def join_room(db, user_id, room_id):
+	try:
+		stmt = select(User.pseudo).where(User.id == user_id)
+		pseudo = db.execute(stmt).scalars().first().pseudo
+
+		message_data = MessageCreate(
+			content=f"{pseudo} a rejoint le chat !",
+			author_id=user_id,
+		)
+		create_message(
+			db=db,
+			room_id=room_id,
+			message_data=message_data,
+			message_type="join_message",
+		)
+		db.commit()
+		return True
+
+	except Exception as e:
+		db.rollback()
+		print(f"Erreur : {e}")
+		return False
+
+
+def join_new_room(db: Session, join_data: JoinRoomSchema):
+	data = join_data.model_dump()
+	stmt = select(Room).where(Room.access_key == data.access_key)
+	room = db.execute(stmt).scalars().first()
+	if not room:
+		db.rollback()
+		raise HTTPException(status_code=401, detail="Clé d'accès incorrect !")
+	if join_room(db=db, user_id=data.user_id, room_id=data.room_id):
+		return room
+	else:
+		raise HTTPException(status_code=400, detail="Erreur inconnue !")
+
+
 def create_room(db: Session, room_data: RoomSchema, creator_id: int):
 	# 1. On transforme le schéma en dict, mais on retire 'creator' car
 	# en BDD on veut juste l'ID du créateur (created_by)
 	data = room_data.model_dump(exclude={"creator"})
 
 	# 2. On crée l'objet Room
-	db_room = Room(**data, created_by=creator_id)
+	try:
+		db_room = Room(**data, created_by=creator_id)
 
-	db.add(db_room)
-	db.commit()
-	db.refresh(db_room)
-	return db_room
+		db.add(db_room)
+		db.flush()
+		db.refresh(db_room)
+		try:
+			db.execute(insert(user_room).values(user_id=user_id, room_id=db_room.id))
+			db.flush()
+			if not join_room(db, creator_id, db_room.id):
+				raise HTTPException(status_code=400, detail="Erreur lors de l'ajout au room !")
+
+			db.flush()
+		except Exception as e:
+			print(f"Erreur lors de l'ajout au room : {e}")
+			db.rollback
+		db.commit()
+		return db_room
+	except IntegrityError:
+		raise HTTPException(status_code=401, detail="Ce nom de salon existe déjà !")
+		db.rollback()
 
 
-# Récupérer TOUS les salons (pour la liste publique)
+# Récupérer TOUS les saplons (pour la liste publique)
 def get_all_rooms(db: Session):
 	stmt = select(Room).options(joinedload(Room.creator))
 	return db.execute(stmt).scalars().all()
-
-
-# database/crud.py
 
 
 def new_user(db: Session, user_data: UserSchema):
@@ -73,14 +122,30 @@ def new_user(db: Session, user_data: UserSchema):
 		# On cherche le salon qui a été créé par défaut lors de l'initialisation
 		stmt = select(Room).where(Room.name == "Salon Général")
 		general_room = db.execute(stmt).scalars().first()
-
 		# 3. Si le salon existe, on l'ajoute à l'utilisateur
 		if general_room:
 			user.rooms.append(general_room)
-
 		db.add(user)
-		db.commit()
+		db.flush()
 		db.refresh(user)
+
+		try:
+			message_data = MessageCreate(
+				content=f"{user.pseudo} a rejoint le chat !",
+				author_id=user.id,
+			)
+			create_message(
+				db=db,
+				room_id=general_room.id,
+				message_data=message_data,
+				message_type="join_message",
+			)
+		except Exception as e:
+			db.rollback()
+			print(f"Erreur : {e}")
+
+		db.commit()
+
 		return user
 	except IntegrityError:
 		db.rollback()
@@ -134,7 +199,7 @@ def get_messages(db: Session, room_id: int):
 		raise HTTPException(status_code=500, detail="Impossible de récupérer les messages")
 
 
-def create_message(db: Session, room_id: int, message_data: MessageCreate):
+def create_message(db: Session, room_id: int, message_data: MessageCreate, message_type=None):
 	# 1. On récupère l'utilisateur pour avoir son pseudo actuel
 	stmt = select(User).where(User.id == message_data.author_id)
 	user = db.execute(stmt).scalars().first()
@@ -150,6 +215,8 @@ def create_message(db: Session, room_id: int, message_data: MessageCreate):
 			room_id=room_id,
 			parent_id=message_data.parent_id,
 		)
+		if message_type:
+			db_message.message_type = message_type
 
 		db.add(db_message)
 		db.commit()
@@ -169,12 +236,25 @@ def reagir(db, message_id: int, reaction_data: ReactionCreateSchema):
 	return reaction
 
 
-def dereagir(db: Session, reaction_id: int):
+def dereagir(db: Session, user_id: int, reaction_id: int):
+	stmt = select(Reaction).options(joinedload(Reaction.message)).where(Reaction.id == reaction_id)
+	reaction = db.execute(stmt).scalars().first()
+	# reaction_copy = reaction
+	if not reaction:
+		raise HTTPException(status_code=404, detail="Réaction introuvable !")
+	elif reaction.user_id != user_id:
+		raise HTTPException(
+			status_code=401, detail="L'id ne correspond pas ! (Ce n'est pas votre réaction)"
+		)
+
 	try:
-		stmt = delete(Reaction).where(Reaction.id == reaction_id)
-		db.execute(stmt)
+		# stmt = delete(Reaction).where(Reaction.id == reaction_id)
+		# db.execute(stmt)
+		db.execute(delete(Reaction).where(Reaction.id == reaction_id))
 		db.commit()
-		return True
+		return reaction
+		# return reaction_copy
 	except Exception as e:
+		db.rollback()
 		print(f"Erreur : {e}")
-		return False
+		raise HTTPException(status_code=400, detail="Erreur lors de la suppression !")

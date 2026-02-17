@@ -15,6 +15,7 @@ from sqlalchemy import (
 )
 
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from sqlalchemy.exc import IntegrityError
 from flet import Icons
 
 DB_FILENAME = "cif_connect_demo.db"
@@ -107,7 +108,7 @@ class Message(Base):
 	__tablename__ = "messages"
 
 	id = Column(Integer, primary_key=True)
-	author_display_name = Column(String, nullable=False)
+	author_display_name = Column(String)
 	# Copie du pseudo au moment de l'envoi (historique)
 	content = Column(String, nullable=False)
 	message_type = Column(String, default="chat_message")
@@ -180,6 +181,17 @@ if __name__ == "__main__":
 
 	Base.metadata.create_all(engine)
 	print(" === Base de données et Tables mises à jour avec succès === ")
+
+	with SessionLocal() as db:
+		try:
+			room_general = Room(
+				name="Salon Général", description="Discussion libre pour tous", icon="71540"
+			)
+			db.add(room_general)
+			db.commit()
+			print(" === Salon Général initié === ")
+		except IntegrityError:
+			db.rollback()
 
 	# Tu peux ajouter ici tes scripts d'insertion de test si nécessaire
 	# mais il vaut mieux utiliser l'API pour créer des données maintenant.

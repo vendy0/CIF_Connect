@@ -86,6 +86,11 @@ def get_my_rooms(email: str, db: Session = Depends(get_db)):
 	return rooms
 
 
+@app.post("/user/rooms/join", response_model=RoomSchema)
+def join_a_room(join_data: JoinRoomSchema, db: Session = Depends(get_db)):
+	response = db_inter.join_new_room(db, join_data)
+
+
 """
 ===== Messages =====
 """
@@ -113,12 +118,9 @@ def send_reaction(
 	return db_inter.reagir(db, message_id, reaction_data)
 
 
-@app.delete("/message/{reaction_id}/reaction")
-def remove_reaction(reaction_id: int, db: Session = Depends(get_db)):
-	if db_inter.dereagir(db, reaction_id):
-		return {"detail": "Réaction supprimé !"}
-	else:
-		return {"detail": "Erreur lors de la suppression !"}
+@app.delete("/message/{reaction_id}/reaction", response_model=ReactionReturnSchema)
+def remove_reaction(user_id: int, reaction_id: int, db: Session = Depends(get_db)):
+	return db_inter.dereagir(db, user_id, reaction_id)
 
 
 """

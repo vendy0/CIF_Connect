@@ -6,7 +6,7 @@ from typing import Optional, List
 # --- Schémas Pydantic ---
 class UserMinimalSchema(BaseModel):
 	id: int
-	pseudo: str | None
+	pseudo: Optional[str] = None
 
 	class Config:
 		from_attributes = True
@@ -19,6 +19,7 @@ class UserSchema(BaseModel):
 	role: str
 	is_banned: bool
 	created_at: datetime
+	last_pseudo_update: datetime
 
 	class Config:
 		from_attributes = True
@@ -31,6 +32,7 @@ class RoomSchema(BaseModel):
 	icon: str
 	created_at: datetime
 	creator: Optional[UserMinimalSchema]
+	messages: List["MessageSchema"] = []
 
 	class Config:
 		from_attributes = True
@@ -42,6 +44,15 @@ class CreateRoomSchema(BaseModel):
 	icon: str
 	access_key: str
 	creator: UserMinimalSchema
+
+	class Config:
+		from_attributes = True
+
+
+class JoinRoomSchema(BaseModel):
+	user_id: int
+	room_id: int
+	access_key: str
 
 	class Config:
 		from_attributes = True
@@ -90,14 +101,11 @@ class MessageSchema(BaseModel):
 	created_at: datetime
 	# room_id suffit souvent, mais tu peux mettre RoomSchema si besoin
 	room_id: int
-
-	# Pour le parent et les réactions :
-	# 1. On utilise 'Optional' car un message n'a pas forcément de parent
-	# 2. On utilise 'List' car un message peut avoir plusieurs réactions
 	parent: Optional["MessageSchema"] = None
-	reactions: List[ReactionSchema] = []
 
 	author: UserMinimalSchema
+
+	reactions: List[ReactionSchema] = []
 
 	class Config:
 		from_attributes = True
@@ -113,3 +121,9 @@ class MessageCreate(BaseModel):
 class ReactionCreateSchema(BaseModel):
 	user_id: int
 	emoji: str
+
+
+class ReactionReturnSchema(BaseModel):
+	id: int
+	emoji: str
+	message: MessageCreate

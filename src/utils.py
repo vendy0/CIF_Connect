@@ -160,13 +160,17 @@ async def shake(control: ft.Control, page: ft.Page):
 
 
 if __name__ == "__main__":
+	print()
+	for i in range(1,100):
+		print(f"\n{generer_pseudo()}")
     # print(Path("./src/chat.py").exists())
     # load_json_file("ft_cols.json")
-    get_avatar_color("SansDetermin108", get_colors())
+    # get_avatar_color("SansDetermin108", get_colors())
 
-    async def view_pop(e):
-        if e.view is not None:
-            print("View pop:", e.view)
-            page.views.remove(e.view)
-            top_view = page.views[-1]
-            await page.push_route(top_view.route)
+    # async def view_pop(e):
+    #     if e.view is not None:
+    #         print("View pop:", e.view)
+    #         page.views.remove(e.view)
+    #         top_view = page.views[-1]
+    #         await page.push_route(top_view.route)
+	pass
