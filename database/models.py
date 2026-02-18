@@ -1,4 +1,3 @@
-# database/models.py (anciennement initialisation.py)
 from sqlalchemy import (
 	create_engine,
 	Column,
@@ -13,19 +12,22 @@ from sqlalchemy import (
 	Index,
 	UniqueConstraint,
 )
-
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.dialects.sqlite import insert
 from flet import Icons
 
 DB_FILENAME = "cif_connect_demo.db"
 
-# --- 1. Moteur & Session ---
-# echo=False en prod pour ne pas polluer les logs, True en dev pour debug
+# ==============================================================================
+# 1. CONFIGURATION MOTEUR & SESSION
+# ==============================================================================
+
+# echo=True utile pour voir les requêtes SQL dans la console en dev
 engine = create_engine(f"sqlite:///{DB_FILENAME}", echo=False, future=True)
 
 
-# Indispensable pour SQLite : active la vérification des clés étrangères
+# Active les Foreign Keys pour SQLite (désactivé par défaut)
 @event.listens_for(engine, "connect")
 def enable_foreign_keys(dbapi_connection, connection_record):
 	cursor = dbapi_connection.cursor()
@@ -36,7 +38,11 @@ def enable_foreign_keys(dbapi_connection, connection_record):
 SessionLocal = sessionmaker(bind=engine, future=True)
 Base = declarative_base()
 
-# --- 2. Tables de liaison ---
+# ==============================================================================
+# 2. TABLES D'ASSOCIATION
+# ==============================================================================
+
+# Table de liaison Many-to-Many entre Users et Rooms (Membre d'un salon)
 user_room = Table(
 	"user_room",
 	Base.metadata,
@@ -44,28 +50,29 @@ user_room = Table(
 	Column("room_id", Integer, ForeignKey("rooms.id"), primary_key=True),
 )
 
-# --- 3. Modèles (Classes) ---
+# ==============================================================================
+# 3. MODÈLES (ENTITÉS)
+# ==============================================================================
 
 
 class User(Base):
 	__tablename__ = "users"
 
 	id = Column(Integer, primary_key=True)
-	email = Column(
-		String, nullable=False, unique=True, index=True
-	)  # Index pour recherche rapide au login
+	email = Column(String, nullable=False, unique=True, index=True)
 	password = Column(String, nullable=False)
-	pseudo = Column(
-		String, nullable=False, unique=True, index=True
-	)  # Index pour recherche de profil
+	pseudo = Column(String, nullable=False, unique=True, index=True)
 	last_pseudo_update = Column(DateTime, server_default=func.current_timestamp(), nullable=False)
 	role = Column(String, default="eleve", nullable=False)
+
+	# Gestion Ban
 	is_banned = Column(Boolean, default=False, nullable=False)
-	ban_expires_at = Column(DateTime)
-	ban_reason = Column(String)
+	ban_expires_at = Column(DateTime, nullable=True)
+	ban_reason = Column(String, nullable=True)
+
 	created_at = Column(DateTime, server_default=func.current_timestamp(), nullable=False)
 
-	# Relations
+	# --- Relations ---
 	created_rooms = relationship("Room", back_populates="creator")
 	rooms = relationship("Room", secondary=user_room, back_populates="users")
 	authored_messages = relationship(
@@ -73,17 +80,12 @@ class User(Base):
 	)
 	reactions = relationship("Reaction", back_populates="user", cascade="all, delete-orphan")
 
+	# Signalements
 	reports_sent = relationship(
-		"Report",
-		back_populates="reporter",
-		foreign_keys="Report.reporter_id",
-		cascade="all, delete-orphan",
+		"Report", back_populates="reporter", foreign_keys="Report.reporter_id"
 	)
 	reports_received = relationship(
-		"Report",
-		back_populates="reported",
-		foreign_keys="Report.reported_id",
-		cascade="all, delete-orphan",
+		"Report", back_populates="reported", foreign_keys="Report.reported_id"
 	)
 
 
@@ -94,11 +96,12 @@ class Room(Base):
 	name = Column(String, nullable=False, unique=True)
 	description = Column(String, nullable=False)
 	icon = Column(String, default=Icons.CHAT_BUBBLE_ROUNDED)
-	access_key = Column(String)  # Clé pour rejoindre un salon privé
+	access_key = Column(String, nullable=True)  # Null = Public
+
 	created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
 	created_at = Column(DateTime, server_default=func.current_timestamp(), nullable=False)
 
-	# Relations
+	# --- Relations ---
 	creator = relationship("User", back_populates="created_rooms")
 	users = relationship("User", secondary=user_room, back_populates="rooms")
 	messages = relationship("Message", back_populates="room", cascade="all, delete-orphan")
@@ -108,10 +111,9 @@ class Message(Base):
 	__tablename__ = "messages"
 
 	id = Column(Integer, primary_key=True)
-	author_display_name = Column(String)
-	# Copie du pseudo au moment de l'envoi (historique)
+	author_display_name = Column(String)  # Pseudo figé au moment de l'envoi
 	content = Column(String, nullable=False)
-	message_type = Column(String, default="chat_message")
+	message_type = Column(String, default="chat")  # 'join', 'alert', etc.
 	created_at = Column(DateTime, server_default=func.current_timestamp(), nullable=False)
 
 	room_id = Column(Integer, ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False)
@@ -122,9 +124,11 @@ class Message(Base):
 		Index("ix_messages_room_id", "room_id"),
 		Index("ix_messages_parent_id", "parent_id"),
 	)
-	# Relations
+
+	# --- Relations ---
 	author = relationship("User", back_populates="authored_messages")
 	room = relationship("Room", back_populates="messages")
+	# Auto-jointure pour les réponses
 	parent = relationship("Message", remote_side=[id], backref="replies")
 	reactions = relationship("Reaction", back_populates="message", cascade="all, delete-orphan")
 	reported_message = relationship("Report", back_populates="message")
@@ -139,13 +143,14 @@ class Reaction(Base):
 	emoji = Column(String, nullable=False)
 	created_at = Column(DateTime, server_default=func.current_timestamp(), nullable=False)
 
-	# Relations
+	# --- Relations ---
 	user = relationship("User", back_populates="reactions")
 	message = relationship("Message", back_populates="reactions")
 
-	# Contrainte unique : Un user ne peut mettre qu'une fois le même emoji sur un message
 	__table_args__ = (
-		UniqueConstraint("user_id", "message_id", name="uix_user_message_reaction"),
+		UniqueConstraint(
+			"user_id", "message_id", name="uix_user_message_reaction"
+		),  # Un seul emoji par msg par user ? À voir si tu veux autoriser plusieurs
 		Index("ix_reactions_message_id", "message_id"),
 	)
 
@@ -162,36 +167,38 @@ class Report(Base):
 	reported_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 	message_id = Column(Integer, ForeignKey("messages.id", ondelete="SET NULL"), nullable=True)
 
-	# Relations
+	# --- Relations ---
 	message = relationship("Message", back_populates="reported_message")
 	reporter = relationship("User", back_populates="reports_sent", foreign_keys=[reporter_id])
 	reported = relationship("User", back_populates="reports_received", foreign_keys=[reported_id])
 
-	# Index pour le dashboard admin
-	__table_args__ = (
-		Index("ix_reports_status", "status"),
-		Index("ix_reports_reported_id", "reported_id"),
-	)
 
+# ==============================================================================
+# 4. INITIALISATION DE LA BDD (Run once)
+# ==============================================================================
 
-# --- 4. Script de création (ne s'exécute que manuellement) ---
 if __name__ == "__main__":
-	# Si tu veux réinitialiser la BDD complètement, décommente la ligne suivante :
+	# Si besoin de tout reset (danger !) :
 	# Base.metadata.drop_all(engine)
 
 	Base.metadata.create_all(engine)
-	print(" === Base de données et Tables mises à jour avec succès === ")
+	print("=== Tables créées ou vérifiées ===")
 
+	# Ajout du Salon Général par défaut
 	with SessionLocal() as db:
-		try:
-			room_general = Room(
-				name="Salon Général", description="Discussion libre pour tous", icon="71540"
+		stmt = (
+			insert(Room)
+			.values(
+				name="Salon Général",
+				description="Discussion libre pour tous",
+				icon=Icons.PUBLIC,
+				access_key=None,
 			)
-			db.add(room_general)
-			db.commit()
-			print(" === Salon Général initié === ")
-		except IntegrityError:
-			db.rollback()
+			.on_conflict_do_nothing(
+				index_elements=["name"]  # colonne unique
+			)
+		)
 
-	# Tu peux ajouter ici tes scripts d'insertion de test si nécessaire
-	# mais il vaut mieux utiliser l'API pour créer des données maintenant.
+		db.execute(stmt)
+		db.commit()
+		print(" === Salon Général initié ===")
