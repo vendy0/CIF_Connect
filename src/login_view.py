@@ -1,6 +1,7 @@
 import flet as ft
 import time
 import asyncio
+from utils import generer_pseudo
 # from utils import shake
 
 
@@ -45,6 +46,7 @@ async def LoginView(page: ft.Page):
                 # --- ICI : Connecter plus tard à ta BDD (gestion_bdd.db) ---
                 # Pour l'instant, on stocke le pseudo dans la session et on navigue
                 # On prend la partie avant le @ comme pseudo temporaire
+                page.session.store.set("pseudo", generer_pseudo())
                 await page.push_route("/rooms")
             update_fields(email_input, password_input)
         page.update()

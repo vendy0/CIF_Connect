@@ -1,6 +1,6 @@
 import flet as ft
 from utils import generer_pseudo
-from flet_storage import FletStorage
+# from flet_storage import FletStorage
 
 # def view_pop(page: ft.Page):
 # 	if len(page.views) > 1:
@@ -21,12 +21,12 @@ async def SettingsView(page: ft.Page):
         else:
             print("Aucune vue précédente.")
 
-    storage = FletStorage("cif_connect_app")
-    await storage.set("pseudo", page.session.store.get("pseudo"))
-
+    # storage = FletStorage("cif_connect_app")
+    # storage.set("pseudo", page.session.store.get("pseudo"))
+    # pseudo = storage.get("pseudo")
     # On déclare 'pseudo' comme global au début pour pouvoir le modifier
     async def back(e):
-        pseudo = await storage.get("pseudo")
+        pseudo = page.session.store.get("pseudo")
         page.session.store.set("pseudo", pseudo)
         await page.go_back()
         # page.views.pop()
@@ -48,7 +48,7 @@ async def SettingsView(page: ft.Page):
     )
 
     # Référence au texte affichant le pseudo pour mise à jour visuelle
-    pseudo = await storage.get("pseudo")
+    pseudo = page.session.store.get("pseudo")
     pseudo_display_text = ft.Text(pseudo)
 
     def changer_pseudo(e):
@@ -64,7 +64,7 @@ async def SettingsView(page: ft.Page):
             actuel_pseudo = nouveau_pseudo_input.value
             # Mise à jour de l'affichage dans la liste sans recharger la page
             pseudo_display_text.value = actuel_pseudo
-            await storage.set("pseudo", actuel_pseudo)
+            page.session.store.set("pseudo", actuel_pseudo)
             dlg.open = False
             page.update()
 
