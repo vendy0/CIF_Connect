@@ -1,0 +1,28 @@
+[project]
+name = "cif-connect"
+version = "0.1.0"
+description = "Discussion libre pour tout les élèves du CIF."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "ErgoXDev", email = "andyvenson99@gmail.com" }
+]
+dependencies = [
+    "flet>=0.80.5"
+]
+
+[dependency-groups]
+dev = [
+    "flet-cli>=0.80.5",
+    "flet-desktop-light>=0.80.5",
+    "flet-web>=0.80.5",
+]
+
+[tool.flet]
+org = "com.mycompany"
+product = "cif-connect"
+company = "ErgoSphere_Inc"
+copyright = "Copyright (C) 2023-2026 by ErgoSphere_Inc"
+
+[tool.flet.app]
+path = "src"
