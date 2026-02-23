@@ -1,124 +1,101 @@
 import flet as ft
-import time
-import asyncio
 from utils import generer_pseudo
-# from utils import shake
+from math import pi
 
 
 async def LoginView(page: ft.Page):
+    is_register_mode = False
 
-    def update_fields(*fields):
-        for f in fields:
-            f.update()
-        page.update()
+    email_input = ft.TextField(label="Email", prefix_icon=ft.Icons.EMAIL, border_radius=10)
+    password_input = ft.TextField(label="Mot de passe", prefix_icon=ft.Icons.LOCK, password=True, can_reveal_password=True, border_radius=10)
+    confirm_password_input = ft.TextField(label="Confirmer le mot de passe", prefix_icon=ft.Icons.LOCK_OUTLINE, password=True, can_reveal_password=True, border_radius=10)
 
-    async def login_click(e):
+    async def handle_submit(e):
         email = email_input.value.strip()
-        mdp = password_input.value
+        password = password_input.value.strip()
+        confirm = confirm_password_input.value.strip()
+
+        email_input.error = password_input.error = confirm_password_input.error = None
+
         if not email:
-            email_input.error = "Veuillez remplir tous les champs"
-        else:
-            email_input.error = None
-        if not mdp:
-            password_input.error = "Veuillez remplir tous les champs"
-        else:
-            password_input.error = None
-            password_input.update()
-        page.update()
-        if mdp and email:
-            if email != "aaaa":
-                email_input.error = "Email incorrect !"
-            elif mdp != "1234":
-                email_input.error = None
-                # await shake(password_input, page)
-                password_input.error = "Mot de passe incorrect !"
-                await page.push_route("/login")
+            email_input.error = "Champ requis"
+        if not password:
+            password_input.error = "Champ requis"
+        if is_register_mode:
+            if not confirm:
+                confirm_password_input.error = "Confirmation requise"
+            elif confirm != password:
+                confirm_password_input.error = "Les mots ne correspondent pas"
 
-            # Simulation de chargement
-            else:
-                login_btn.content = ft.ProgressRing(width=20, height=20, stroke_width=2, color="white")
-                login_btn.disabled = True
-                login_btn.icon = None
-                page.update()
-
-                # time.sleep(10)  # Juste pour l'effet visuel
-
-                # --- ICI : Connecter plus tard à ta BDD (gestion_bdd.db) ---
-                # Pour l'instant, on stocke le pseudo dans la session et on navigue
-                # On prend la partie avant le @ comme pseudo temporaire
-                page.session.store.set("pseudo", generer_pseudo())
-                await page.push_route("/rooms")
-            update_fields(email_input, password_input)
         page.update()
 
-    # Lopush_route
-    lopush_route = ft.Image(
-        src="lopush_route.png",  # Flet cherche automatiquement dans 'assets'
-        width=120,
-        height=120,
-        fit=ft.BoxFit.CONTAIN,
-    )
+        if email and password and (not is_register_mode or password == confirm):
+            page.session.store.set("pseudo", generer_pseudo())
+            await page.push_route("/rooms")
 
-    # Champs de saisie
-    email_input = ft.TextField(
-        label="Email personnel",
-        prefix_icon=ft.Icons.EMAIL,
-        border_radius=10,
-        keyboard_type=ft.KeyboardType.EMAIL,
-        on_submit=lambda e: password_input.focus(),
-    )
+    main_button = ft.Button(width=220, height=50, on_click=handle_submit)
+    toggle_button = ft.TextButton()
 
-    password_input = ft.TextField(
-        label="Mot de passe",
-        prefix_icon=ft.Icons.LOCK,
-        password=True,
-        can_reveal_password=True,
-        border_radius=10,
-        on_submit=login_click,  # Permet de valider avec "Entrée"
-    )
+    def build_form():
+        if is_register_mode:
+            title = "Créer un compte"
+            subtitle = "Entre dans l’espace"
+            main_button.content = "S'inscrire"
+            main_button.icon = ft.Icons.PERSON_ADD
+            toggle_button.content = "Déjà inscrit ? Se connecter"
+            fields = [email_input, password_input, confirm_password_input]
+        else:
+            title = "Connexion"
+            subtitle = "Bon retour"
+            main_button.content = "Se connecter"
+            main_button.icon = ft.Icons.LOGIN
+            toggle_button.content = "Pas encore inscrit ? S'inscrire"
+            fields = [email_input, password_input]
 
-    login_btn = ft.ElevatedButton(
-        content="Se connecter",
-        icon=ft.Icons.LOGIN,
-        width=200,
-        height=50,
-        style=ft.ButtonStyle(
-            shape=ft.RoundedRectangleBorder(radius=10),
-            bgcolor=ft.Colors.BLUE_600,
-            color="white",
-        ),
-        on_click=login_click,
-    )
+        return ft.Container(
+            width=400,
+            padding=30,
+            border_radius=20,
+            bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
+            animate_rotation=400,
+            animate_scale=400,
+            rotate=0,
+            scale=1,
+            content=ft.Column(
+                spacing=15,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                controls=[
+                    ft.Text(title, size=28, weight=ft.FontWeight.BOLD),
+                    ft.Text(subtitle, size=14, color=ft.Colors.GREY_500),
+                    ft.Divider(),
+                    *fields,
+                    main_button,
+                    toggle_button,
+                ],
+            ),
+        )
 
-    # Structure de la page (View)
+    switcher = ft.AnimatedSwitcher(
+        content=build_form(),
+        transition=ft.AnimatedSwitcherTransition.SCALE,
+        duration=400,
+        switch_in_curve=ft.AnimationCurve.EASE_IN_OUT,
+        switch_out_curve=ft.AnimationCurve.EASE_IN_OUT,
+    )
+    def toggle_mode(e):
+        nonlocal is_register_mode
+        is_register_mode = not is_register_mode
+        
+        # L'AnimatedSwitcher s'occupe déjà de l'effet de transition (SCALE)
+        switcher.content = build_form()
+        page.update()
+
+        
+    toggle_button.on_click = toggle_mode
+
     return ft.View(
-        route="/",
-        controls=[
-            ft.Container(
-                content=ft.Column(
-                    controls=[
-                        ft.Container(height=20),  # Espace vide
-                        lopush_route,
-                        ft.Text(
-                            "CIF Connect",
-                            size=30,
-                            weight=ft.FontWeight.BOLD,
-                            color=ft.Colors.BLUE_GREY_900,
-                        ),
-                        ft.Text("Chat anonyme du campus", size=16, color=ft.Colors.GREY_500),
-                        ft.Container(height=30),
-                        email_input,
-                        ft.Container(height=10),
-                        password_input,
-                        ft.Container(height=20),
-                        login_btn,
-                    ],
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                ),
-                padding=30,
-                alignment=ft.Alignment.CENTER,
-            )
-        ],
+        route="/login",
         vertical_alignment=ft.MainAxisAlignment.CENTER,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        controls=[switcher],
     )

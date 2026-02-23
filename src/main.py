@@ -9,7 +9,6 @@ from utils import generer_pseudo, rooms, Room, generate_secure_code
 
 
 async def main(page: ft.Page):
-
     page.title = "CIF Connect"
     page.theme_mode = ft.ThemeMode.LIGHT
 
@@ -64,10 +63,7 @@ async def main(page: ft.Page):
     async def view_pop(view):
         if len(page.views) > 1:
             page.views.pop()
-            previous = page.views[-1]
-            await page.push_route(previous.route)
-        else:
-            print("Aucune vue précédente.")
+            page.update()
 
     page.on_route_change = route_change
     page.on_view_pop = view_pop
