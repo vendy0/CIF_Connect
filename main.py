@@ -7,6 +7,7 @@ from typing import List
 from database.models import SessionLocal
 import database.crud as db_inter
 from database.shemas import *
+from security import create_access_token
 
 app = FastAPI(title="CIF Connect API", version="1.0.0")
 
@@ -15,11 +16,11 @@ app = FastAPI(title="CIF Connect API", version="1.0.0")
 # DEPENDANCE DATABASE
 # ==============================================================================
 def get_db():
-	db = SessionLocal()
-	try:
-		yield db
-	finally:
-		db.close()
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 # ==============================================================================
@@ -27,42 +28,41 @@ def get_db():
 # ==============================================================================
 
 
-@app.post(
-	"/register", response_model=UserSchema, status_code=status.HTTP_201_CREATED, tags=["Users"]
-)
+@app.post("/register", response_model=UserSchema, status_code=status.HTTP_201_CREATED, tags=["Users"])
 def register(data: RegisterRequest, db: Session = Depends(get_db)):
-	"""Crée un nouvel utilisateur"""
-	return db_inter.new_user(db, data)
+    """Crée un nouvel utilisateur"""
+    return db_inter.new_user(db, data)
 
 
-@app.post("/login", response_model=UserSchema, tags=["Users"])
+@app.post("/login", response_model=Token, tags=["Users"])
 def login(data: LoginRequest, db: Session = Depends(get_db)):
-	"""Authentification simple (Email + Password)"""
-	user = db_inter.get_user_by_email(db, data.email)
+    """Authentification simple (Email + Password)"""
+    user = db_inter.get_user_by_email(db, data.email)
 
-	# Vérification (Attention: MDP en clair ici, à hasfer en prod !)
-	if not user or user.password != data.password:
-		raise HTTPException(status_code=401, detail="Identifiants incorrects")
+    # Vérification (Attention: MDP en clair ici, à hasfer en prod !)
+    if not user or user.password != data.password:
+        raise HTTPException(status_code=401, detail="Identifiants incorrects")
 
-	if user.is_banned:
-		raise HTTPException(status_code=403, detail="Compte banni.")
-
-	return user
+    if user.is_banned:
+        raise HTTPException(status_code=403, detail="Compte banni.")
+    # ... après avoir vérifié que l'utilisateur existe et que le MDP est bon ...
+    access_token = create_access_token(data={"sub": user.id, "pseudo": user.pseudo, "role": user.role})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @app.get("/users", response_model=List[UserSchema], tags=["Users"])
 def list_all_users(db: Session = Depends(get_db)):
-	"""Admin only: Liste tous les utilisateurs"""
-	return db_inter.get_all_users(db)
+    """Admin only: Liste tous les utilisateurs"""
+    return db_inter.get_all_users(db)
 
 
 @app.put("/users/{user_id}/pseudo", tags=["Users"])
 def change_pseudo(user_id: int, data: PseudoUpdateRequest, db: Session = Depends(get_db)):
-	"""Changer son pseudo"""
-	user = db_inter.update_user_pseudo(db, user_id, data.new_pseudo)
-	if not user:
-		raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-	return {"detail": "Pseudo modifié", "new_pseudo": user.pseudo}
+    """Changer son pseudo"""
+    user = db_inter.update_user_pseudo(db, user_id, data.new_pseudo)
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    return {"detail": "Pseudo modifié", "new_pseudo": user.pseudo}
 
 
 # ==============================================================================
@@ -72,56 +72,56 @@ def change_pseudo(user_id: int, data: PseudoUpdateRequest, db: Session = Depends
 
 @app.get("/rooms", response_model=List[RoomSchema], tags=["Rooms"])
 def list_all_rooms(db: Session = Depends(get_db)):
-	"""Liste publique des salons"""
-	return db_inter.get_all_rooms(db)
+    """Liste publique des salons"""
+    return db_inter.get_all_rooms(db)
 
 
 @app.post("/rooms", response_model=RoomSchema, status_code=status.HTTP_201_CREATED, tags=["Rooms"])
 def create_room(data: CreateRoomSchema, db: Session = Depends(get_db)):
-	"""Créer un nouveau salon"""
-	# L'ID du créateur est dans le body (data.creator_id)
-	return db_inter.create_room(db, data, creator_id=data.creator_id)
+    """Créer un nouveau salon"""
+    # L'ID du créateur est dans le body (data.creator_id)
+    return db_inter.create_room(db, data, creator_id=data.creator_id)
 
 
 @app.put("/rooms/{room_id}", response_model=RoomSchema, tags=["Rooms"])
 def update_room_info(
-	room_id: int,
-	update_data: RoomUpdateSchema,
-	user_id: int,  # On demande l'ID de l'user (idéalement via token, ici via query pour la démo)
-	db: Session = Depends(get_db),
+    room_id: int,
+    update_data: RoomUpdateSchema,
+    user_id: int,  # On demande l'ID de l'user (idéalement via token, ici via query pour la démo)
+    db: Session = Depends(get_db),
 ):
-	"""
-	Modifier un salon (Nom, description, icône).
-	Seul le créateur peut le faire.
-	"""
-	return db_inter.update_room(db, room_id, user_id, update_data)
+    """
+    Modifier un salon (Nom, description, icône).
+    Seul le créateur peut le faire.
+    """
+    return db_inter.update_room(db, room_id, user_id, update_data)
 
 
 @app.delete("/rooms/{room_id}", response_model=RoomReturnSchema, tags=["Rooms"])
 def delete_room(room_id: int, user_id: int, db: Session = Depends(get_db)):
-	"""
-	Supprimer définitivement un salon.
-	Seul le créateur peut le faire.
-	"""
-	return db_inter.delete_room_func(db, room_id, user_id)
+    """
+    Supprimer définitivement un salon.
+    Seul le créateur peut le faire.
+    """
+    return db_inter.delete_room_func(db, room_id, user_id)
 
 
 @app.get("/user/rooms", response_model=List[RoomSchema], tags=["Rooms"])
 def get_my_rooms(email: str, db: Session = Depends(get_db)):
-	"""Récupère les salons d'un utilisateur spécifique"""
-	return db_inter.get_user_rooms(db, email)
+    """Récupère les salons d'un utilisateur spécifique"""
+    return db_inter.get_user_rooms(db, email)
 
 
 @app.post("/user/rooms/join", response_model=RoomSchema, tags=["Rooms"])
 def join_room(data: JoinRoomSchema, db: Session = Depends(get_db)):
-	"""Rejoindre un salon existant"""
-	return db_inter.join_new_room(db, data)
+    """Rejoindre un salon existant"""
+    return db_inter.join_new_room(db, data)
 
 
 @app.post("/user/rooms/{room_id}/quit", response_model=RoomSchema, tags=["Rooms"])
 def quit_room(room_id: int, user_id: int, db: Session = Depends(get_db)):
-	"""Quitter un salon"""
-	return db_inter.quit_room_func(db, user_id=user_id, room_id=room_id)
+    """Quitter un salon"""
+    return db_inter.quit_room_func(db, user_id=user_id, room_id=room_id)
 
 
 # ==============================================================================
@@ -131,19 +131,19 @@ def quit_room(room_id: int, user_id: int, db: Session = Depends(get_db)):
 
 @app.get("/room/{room_id}/messages", response_model=List[MessageSchema], tags=["Messages"])
 def read_messages(room_id: int, db: Session = Depends(get_db)):
-	"""Lire l'historique d'un salon"""
-	return db_inter.get_messages(db, room_id)
+    """Lire l'historique d'un salon"""
+    return db_inter.get_messages(db, room_id)
 
 
 @app.post(
-	"/room/{room_id}/messages",
-	response_model=MessageSchema,
-	status_code=status.HTTP_201_CREATED,
-	tags=["Messages"],
+    "/room/{room_id}/messages",
+    response_model=MessageSchema,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Messages"],
 )
 def send_message(room_id: int, message_data: MessageCreate, db: Session = Depends(get_db)):
-	"""Poster un message dans un salon"""
-	return db_inter.create_message(db, room_id, message_data)
+    """Poster un message dans un salon"""
+    return db_inter.create_message(db, room_id, message_data)
 
 
 # MODÉRATION DES MESSAGES
@@ -151,11 +151,11 @@ def send_message(room_id: int, message_data: MessageCreate, db: Session = Depend
 
 @app.delete("/message/{message_id}", tags=["Messages"])
 def delete_message(message_id: int, user_id: int, db: Session = Depends(get_db)):
-	"""
-	Supprimer un message.
-	Possible si on est l'auteur OU si on est Admin.
-	"""
-	return db_inter.delete_message_func(db, message_id, user_id)
+    """
+    Supprimer un message.
+    Possible si on est l'auteur OU si on est Admin.
+    """
+    return db_inter.delete_message_func(db, message_id, user_id)
 
 
 # ==============================================================================
@@ -164,27 +164,26 @@ def delete_message(message_id: int, user_id: int, db: Session = Depends(get_db))
 
 
 @app.post("/message/{message_id}/reaction", response_model=ReactionSchema, tags=["Reactions"])
-def add_reaction(
-	message_id: int, reaction_data: ReactionCreateSchema, db: Session = Depends(get_db)
-):
-	"""Ajouter un emoji à un message"""
-	return db_inter.reagir(db, message_id, reaction_data)
+def add_reaction(message_id: int, reaction_data: ReactionCreateSchema, db: Session = Depends(get_db)):
+    """Ajouter un emoji à un message"""
+    return db_inter.reagir(db, message_id, reaction_data)
 
 
 @app.delete("/reaction/{reaction_id}", response_model=ReactionReturnSchema, tags=["Reactions"])
 def remove_reaction(reaction_id: int, user_id: int, db: Session = Depends(get_db)):
-	"""
-	Supprimer une réaction.
-	On demande user_id en query param pour vérifier que c'est bien l'auteur.
-	"""
-	return db_inter.dereagir(db, user_id, reaction_id)
+    """
+    Supprimer une réaction.
+    On demande user_id en query param pour vérifier que c'est bien l'auteur.
+    """
+    return db_inter.dereagir(db, user_id, reaction_id)
+
+
 # ==============================================================================
 # SIGNALEMENTS (REPORTS)
 # ==============================================================================
 
-@app.post(
-    "/reports", response_model=ReportSchema, status_code=status.HTTP_201_CREATED, tags=["Reports"]
-)
+
+@app.post("/reports", response_model=ReportSchema, status_code=status.HTTP_201_CREATED, tags=["Reports"])
 def send_report(data: ReportCreateSchema, db: Session = Depends(get_db)):
     """
     Créer un nouveau signalement.
@@ -202,18 +201,13 @@ def list_reports(db: Session = Depends(get_db)):
 
 
 @app.post("/reports/{report_id}/resolve", response_model=ReportSchema, tags=["Reports"])
-def resolve_report(
-    report_id: int, 
-    resolution_data: ReportResolutionSchema, 
-    db: Session = Depends(get_db)
-):
+def resolve_report(report_id: int, resolution_data: ReportResolutionSchema, db: Session = Depends(get_db)):
     """
     (Admin) Résoudre un signalement avec action optionnelle (Ban).
-    
+
     - status: 'resolved', 'dismissed', etc.
     - ban_user: true/false
     - ban_duration_hours: int (si vide = définitif)
     """
     # Ici, tu devrais vérifier si l'user connecté est admin (via dépendance ou check manuel)
     return db_inter.process_report_resolution(db, report_id, resolution_data)
-
