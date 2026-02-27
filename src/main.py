@@ -43,10 +43,7 @@ async def main(page: ft.Page):
     async def route_change():  # e : ft.RouteChangeEvent):
         # e.route (ou page.route) contient la route active
         if page.route == "/login" or page.route == "/":
-            if page.session.store.contains_key("pseudo"):
-                page.views.append(await RoomsView(page))
-            else:
-                page.views.append(await LoginView(page))
+            page.views.append(await LoginView(page))
         elif page.route == "/rooms":
             page.views.append(await RoomsView(page))
         elif page.route == "/chat":
@@ -70,10 +67,10 @@ async def main(page: ft.Page):
 
     # Lancement initial
     # async def verify_pseudo(pseudo=None):
-    if page.session.store.contains_key("pseudo"):
-        await page.push_route("/rooms")
-    else:
-        await page.push_route("/login")
+    # if page.session.store.contains_key("pseudo"):
+    #     await page.push_route("/rooms")
+    # else:
+    await page.push_route("/login")
 
     # verify_pseudo(pseudo if pseudo else None)
     await route_change()

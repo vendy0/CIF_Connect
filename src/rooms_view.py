@@ -1,5 +1,6 @@
 import flet as ft
 import httpx
+from utils import Room
 # import asyncio
 # class Room_Description()
 
@@ -9,11 +10,13 @@ port = "8000"
 
 
 async def RoomsView(page: ft.Page):
-
-
     # 1. On récupère le badge de sécurité (le token)
     sp = ft.SharedPreferences()
     token = await sp.get("cif_token")
+    # values = await sp.get_keys("")
+
+    # for key in values:
+    #     print(key)
 
     # 2. On prépare l'enveloppe (le header)
     headers = {"Authorization": f"Bearer {token}"}
@@ -21,7 +24,7 @@ async def RoomsView(page: ft.Page):
     # 3. On demande la liste fraîche au serveur
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(f"http://{host}:{port}/rooms", headers=headers)
+            response = await client.get(f"http://{host}:{port}/user/rooms", headers=headers)
 
             # Si le jeton est expiré ou invalide (401)
             if response.status_code == 401:
@@ -29,7 +32,7 @@ async def RoomsView(page: ft.Page):
                 await page.push_route("/login")  # On redirige
                 return
 
-            rooms_data = response.json()
+            rooms = response.json()
     except Exception as e:
         # En cas de problème réseau par exemple
         print(f"Erreur de connexion : {e}")
@@ -50,7 +53,7 @@ async def RoomsView(page: ft.Page):
 
     for r in rooms:
         # Création de l'objet Room à partir du dictionnaire 'r'
-        new_room_obj = Room(page=page, room_id=r["id"], name=r["name"], desc=r["description"], icon=r["icon"])
+        new_room_obj = Room(page=page, room_id=r["id"], name=r["name"], description=r["description"], icon=r["icon"])
         # Ajout du composant visuel à la ListView
         room_list.controls.append(new_room_obj.controls)
 

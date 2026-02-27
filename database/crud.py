@@ -39,15 +39,14 @@ def get_user_by_email(db: Session, email: str):
 
 def new_user(db: Session, user_data: RegisterRequest):
     try:
-        
         # 1. Création de l'objet utilisateur
         # On transforme le Pydantic en dict
         user_dict = user_data.model_dump()
-        
+
         # On Vérifie la longueur du mot de passe
         if len(user_dict["password"]) < 8:
             raise HTTPException(status_code=403, detail="Le mot de pass est trop court !")
-        
+
         user_dict["password"] = get_password_hash(user_dict["password"])
         user = User(**user_dict)
 
@@ -124,9 +123,9 @@ def get_all_rooms(db: Session):
     return db.execute(stmt).scalars().all()
 
 
-def get_user_rooms(db: Session, email: str):
+def get_user_rooms(db: Session, user_id: int):
     # Récupère l'utilisateur et charge ses salons
-    stmt = select(User).options(joinedload(User.rooms).joinedload(Room.creator)).where(User.email == email)
+    stmt = select(User).options(joinedload(User.rooms).joinedload(Room.creator)).where(User.id == user_id)
     user = db.execute(stmt).scalars().first()
 
     if not user:

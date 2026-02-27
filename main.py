@@ -30,8 +30,15 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
         if user_id is None:
             raise credentials_exception
+        try:
+            user_id=int(user_id)
+        except:
+            raise credentials_exception
+            return None
+            
         return user_id  # On retourne l'ID pour que la route sache qui appelle
-    except JWTError:
+    except JWTError as e:
+        print(e)
         # Si le jeton est expiré ou falsifié, on lève une erreur 401
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -74,7 +81,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     if user.is_banned:
         raise HTTPException(status_code=403, detail="Compte banni.")
     # ... après avoir vérifié que l'utilisateur existe et que le MDP est bon ...
-    access_token = create_access_token(data={"sub": user.id, "pseudo": user.pseudo, "role": user.role})
+    access_token = create_access_token(data={"sub": str(user.id), "pseudo": user.pseudo, "role": user.role})
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -139,9 +146,9 @@ def delete_room(room_id: int, user_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/user/rooms", response_model=List[RoomSchema], tags=["Rooms"])
-def get_my_rooms(email: str, db: Session = Depends(get_db)):
+def get_my_rooms(db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user)):
     """Récupère les salons d'un utilisateur spécifique"""
-    return db_inter.get_user_rooms(db, email)
+    return db_inter.get_user_rooms(db, current_user_id)
 
 
 @app.post("/user/rooms/join", response_model=RoomSchema, tags=["Rooms"])
