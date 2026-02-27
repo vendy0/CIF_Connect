@@ -7,14 +7,38 @@ from typing import List
 from database.models import SessionLocal
 import database.crud as db_inter
 from database.shemas import *
-from security import create_access_token
+from security import create_access_token, verify_password, SECRET_KEY, ALGORITHM
+
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt, JWTError
+
 
 app = FastAPI(title="CIF Connect API", version="1.0.0")
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 # ==============================================================================
 # DEPENDANCE DATABASE
 # ==============================================================================
+
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        # 1. On tente de décoder le jeton avec notre SECRET_KEY
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: int = payload.get("sub")
+
+        if user_id is None:
+            raise credentials_exception
+        return user_id  # On retourne l'ID pour que la route sache qui appelle
+    except JWTError:
+        # Si le jeton est expiré ou falsifié, on lève une erreur 401
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Jeton invalide ou expiré",
+        )
+
+
 def get_db():
     db = SessionLocal()
     try:
@@ -28,10 +52,12 @@ def get_db():
 # ==============================================================================
 
 
-@app.post("/register", response_model=UserSchema, status_code=status.HTTP_201_CREATED, tags=["Users"])
+@app.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED, tags=["Users"])
 def register(data: RegisterRequest, db: Session = Depends(get_db)):
     """Crée un nouvel utilisateur"""
-    return db_inter.new_user(db, data)
+    user = db_inter.new_user(db, data)
+    access_token = create_access_token(data={"sub": user.id, "pseudo": user.pseudo, "role": user.role})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @app.post("/login", response_model=Token, tags=["Users"])
@@ -40,8 +66,10 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     user = db_inter.get_user_by_email(db, data.email)
 
     # Vérification (Attention: MDP en clair ici, à hasfer en prod !)
-    if not user or user.password != data.password:
-        raise HTTPException(status_code=401, detail="Identifiants incorrects")
+    if not user:
+        raise HTTPException(status_code=401, detail="Utilisateur introuvable !")
+    elif not verify_password(data.password, user.password):
+        raise HTTPException(status_code=401, detail="Mot de passe incorrect !")
 
     if user.is_banned:
         raise HTTPException(status_code=403, detail="Compte banni.")
@@ -71,8 +99,12 @@ def change_pseudo(user_id: int, data: PseudoUpdateRequest, db: Session = Depends
 
 
 @app.get("/rooms", response_model=List[RoomSchema], tags=["Rooms"])
-def list_all_rooms(db: Session = Depends(get_db)):
+def list_rooms(
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(get_current_user),  # Le verrou est ici !
+):
     """Liste publique des salons"""
+    # Logique pour chercher les salons en base de données
     return db_inter.get_all_rooms(db)
 
 

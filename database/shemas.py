@@ -13,13 +13,14 @@ class UserMinimalSchema(BaseModel):
     id: int
     pseudo: Optional[str] = None
 
-    class Config:
+    class ConfigDict:
         from_attributes = True
 
 
 # ==============================================================================
 # UTILISATEURS (USERS)
 # ==============================================================================
+
 
 class Token(BaseModel):
     access_token: str
@@ -37,7 +38,7 @@ class UserSchema(BaseModel):
     created_at: datetime
     last_pseudo_update: datetime
 
-    class Config:
+    class ConfigDict:
         from_attributes = True
 
 
@@ -78,7 +79,7 @@ class ReactionSchema(BaseModel):
     # On inclut qui a réagi
     user: UserMinimalSchema
 
-    class Config:
+    class ConfigDict:
         from_attributes = True
 
 
@@ -104,7 +105,7 @@ class MessageSchema(BaseModel):
     author: UserMinimalSchema
     reactions: List[ReactionSchema] = []
 
-    class Config:
+    class ConfigDict:
         from_attributes = True
 
 
@@ -133,12 +134,12 @@ class RoomSchema(BaseModel):
     id: int
     name: str
     description: str
-    icon: str
+    icon: int
     created_at: datetime
     creator: Optional[UserMinimalSchema]  # Optional car le créateur peut avoir été supprimé
     # On n'inclut pas toujours les messages par défaut pour ne pas alourdir
 
-    class Config:
+    class ConfigDict:
         from_attributes = True
 
 
@@ -147,7 +148,7 @@ class CreateRoomSchema(BaseModel):
 
     name: str
     description: str
-    icon: str
+    icon: int
     access_key: Optional[str] = None  # Optionnel si public
     creator_id: int  # On passe l'ID, pas tout l'objet user
 
@@ -166,7 +167,7 @@ class RoomUpdateSchema(BaseModel):
 
     name: Optional[str] = None
     description: Optional[str] = None
-    icon: Optional[str] = None
+    icon: Optional[int] = None
     access_key: Optional[str] = None
 
 
@@ -210,7 +211,7 @@ class ReportSchema(BaseModel):
     reported_id: Optional[int]
     message_id: Optional[int]
 
-    class Config:
+    class ConfigDict:
         from_attributes = True
 
 
@@ -233,5 +234,5 @@ class ReportFullSchema(ReportSchema):
     reported: Optional[UserMinimalSchema]
     # On pourrait aussi inclure le contenu du message signalé si besoin
 
-    class Config:
+    class ConfigDict:
         from_attributes = True
