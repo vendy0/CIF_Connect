@@ -13,6 +13,8 @@ from utils import generer_pseudo
 
 
 async def SettingsView(page: ft.Page):
+    storage = ft.SharedPreferences()
+    pseudo = storage.get("pseudo")
     async def view_pop(view):
         if len(page.views) > 1:
             page.views.pop()

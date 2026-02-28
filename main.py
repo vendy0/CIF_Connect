@@ -26,16 +26,16 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
         # 1. On tente de décoder le jeton avec notre SECRET_KEY
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("sub")
+        user_id: str = payload.get("sub")
 
         if user_id is None:
             raise credentials_exception
         try:
-            user_id=int(user_id)
+            user_id = int(user_id)
         except:
             raise credentials_exception
             return None
-            
+
         return user_id  # On retourne l'ID pour que la route sache qui appelle
     except JWTError as e:
         print(e)
@@ -63,7 +63,7 @@ def get_db():
 def register(data: RegisterRequest, db: Session = Depends(get_db)):
     """Crée un nouvel utilisateur"""
     user = db_inter.new_user(db, data)
-    access_token = create_access_token(data={"sub": user.id, "pseudo": user.pseudo, "role": user.role})
+    access_token = create_access_token(data={"sub": str(user.id), "pseudo": user.pseudo, "role": user.role})
     return {"access_token": access_token, "token_type": "bearer"}
 
 

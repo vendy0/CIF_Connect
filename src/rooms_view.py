@@ -1,8 +1,6 @@
 import flet as ft
 import httpx
 from utils import Room
-# import asyncio
-# class Room_Description()
 
 
 host = "127.0.0.1"
