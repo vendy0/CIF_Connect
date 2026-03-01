@@ -84,7 +84,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
 		raise HTTPException(status_code=403, detail="Compte banni.")
 	# ... après avoir vérifié que l'utilisateur existe et que le MDP est bon ...
 	access_token = create_access_token(
-		data={"sub": str(user.id), "pseudo": user.pseudo, "role": user.role, "email":user.email}
+		data={"sub": str(user.id), "pseudo": user.pseudo, "role": user.role, "email": user.email}
 	)
 	return {"access_token": access_token, "token_type": "bearer"}
 
@@ -95,10 +95,14 @@ def list_all_users(db: Session = Depends(get_db)):
 	return db_inter.get_all_users(db)
 
 
-@app.put("/users/{user_id}/pseudo", tags=["Users"])
-def change_pseudo(user_id: int, data: PseudoUpdateRequest, db: Session = Depends(get_db)):
+@app.put("/users/pseudo", tags=["Users"])
+def change_pseudo(
+	data: PseudoUpdateRequest,
+	current_user_id: int = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
 	"""Changer son pseudo"""
-	user = db_inter.update_user_pseudo(db, user_id, data.new_pseudo)
+	user = db_inter.update_user_pseudo(db, current_user_id, data.new_pseudo)
 	if not user:
 		raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
 	return {"detail": "Pseudo modifié", "new_pseudo": user.pseudo}
@@ -120,10 +124,14 @@ def list_rooms(
 
 
 @app.post("/rooms", response_model=RoomSchema, status_code=status.HTTP_201_CREATED, tags=["Rooms"])
-def create_room(data: CreateRoomSchema, db: Session = Depends(get_db)):
+def create_room(
+	data: CreateRoomSchema,
+	creator_id: int = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
 	"""Créer un nouveau salon"""
 	# L'ID du créateur est dans le body (data.creator_id)
-	return db_inter.create_room(db, data, creator_id=data.creator_id)
+	return db_inter.create_room(db, data, creator_id=creator_id)
 
 
 @app.put("/rooms/{room_id}", response_model=RoomSchema, tags=["Rooms"])
@@ -140,7 +148,7 @@ def update_room_info(
 	return db_inter.update_room(db, room_id, user_id, update_data)
 
 
-@app.delete("/rooms/{room_id}", response_model=RoomReturnSchema, tags=["Rooms"])
+@app.delete("/rooms/{room_id}/", response_model=RoomReturnSchema, tags=["Rooms"])
 def delete_room(room_id: int, user_id: int, db: Session = Depends(get_db)):
 	"""
 	Supprimer définitivement un salon.
@@ -173,9 +181,11 @@ def quit_room(room_id: int, user_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/room/{room_id}/messages", response_model=List[MessageSchema], tags=["Messages"])
-def read_messages(room_id: int, db: Session = Depends(get_db)):
-	"""Lire l'historique d'un salon"""
-	return db_inter.get_messages(db, room_id)
+def read_messages(
+	room_id: int, current_user_id: int = Depends(get_current_user), db: Session = Depends(get_db)
+):
+	"""Lire l'historique d'un salon. Si l'utilisateur n'est pas dans le salon on restreind l'accès."""
+	return db_inter.get_messages(db, room_id, current_user_id)
 
 
 @app.post(

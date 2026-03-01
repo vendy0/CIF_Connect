@@ -22,7 +22,7 @@ import httpx
 # --- Modèle simple pour un message
 @dataclass
 class Message:
-	author_display_name: str
+	pseudo: str
 	content: str
 	message_type: str
 
@@ -65,13 +65,13 @@ class ChatMessage(ft.Row):
 		)
 
 		# Avatar + contenu du message
-		self.initials = get_initials(self.message.author_display_name)
-		self.avatar_color = get_avatar_color(self.message.author_display_name, COLORS_LOOKUP)
+		self.initials = get_initials(self.message.pseudo)
+		self.avatar_color = get_avatar_color(self.message.pseudo, COLORS_LOOKUP)
 
 		msg_content = ft.Container(
 			content=ft.Column(
 				[
-					ft.Text(message.author_display_name, size=12, weight="bold"),
+					ft.Text(message.pseudo, size=12, weight="bold"),
 					ft.Text(message.content),
 				],
 				spacing=2,
@@ -202,8 +202,8 @@ async def ChatView(page: ft.Page):
 
 		page.pubsub.send_all(
 			Message(
-				user=await storage.get("user_pseudo"),
-				text=new_message.value.strip(),
+				pseudo=await storage.get("user_pseudo"),
+				content=new_message.value.strip(),
 				message_type="chat_message",
 			)
 		)
@@ -236,8 +236,12 @@ async def ChatView(page: ft.Page):
 	# On affiche les messages
 	if messages_received:
 		for message_to_show in messages_received:
-			print(type(message_to_show))
-			# on_message(message_to_show)
+			me = Message(
+				pseudo=message_to_show["author_display_name"],
+				content=message_to_show["content"],
+				message_type=message_to_show["message_type"],
+			)
+			on_message(me)
 
 	page.pubsub.subscribe(on_message)
 

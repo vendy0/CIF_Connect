@@ -2,6 +2,9 @@
 - Boite de dialogue de bienvenue
 - Quand qlq'un change de pseudo faut l'avertir que ça se verra dans les rooms créés.
 - Le "Membre depuis"
+- Retirer le host et le port de utils.py et les mettre dans un .env
+- Les loadings.
+- Mettre un publique / private quand on crée une room
 """
 # - Page de connexion
 # - Le jwt à la place des id dans les requetes.
