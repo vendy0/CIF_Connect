@@ -8,8 +8,10 @@ import string
 import asyncio
 import base64
 import json
+
 host = "127.0.0.1"
 port = "8000"
+
 
 async def view_pop(view, page):
 	if len(page.views) > 1:
@@ -70,11 +72,9 @@ class Room:
 			on_click=self.join_room,
 		)
 
-	def join_room(self, e):
+	async def join_room(self, e):
+		self.page.session.store.set("current_room_id", self.id)
 		asyncio.create_task(self.page.push_route(route="/chat"))
-
-
-rooms = []
 
 
 def load_json_file(filename):
@@ -117,16 +117,6 @@ def get_colors():
 	if not cols:
 		return ["#FF5733", "#33FF57", "#3357FF", "#F0F0F0"]
 	return cols
-
-
-# def get_avatar_color(user_name, colors_lookup):
-# 	if not colors_lookup:
-# 		return "#CCCCCC"
-# 	hash_object = hashlib.md5(user_name.encode())
-# 	hash_hex = hash_object.hexdigest()
-# 	hash_int = int(hash_hex[:8], 16)
-# 	print(colors_lookup[hash_int % len(colors_lookup)])
-# 	return Colors.colors_lookup[hash_int % len(colors_lookup)]
 
 
 def get_avatar_color(username, colors_lookup):

@@ -1,7 +1,8 @@
 import flet as ft
 from dataclasses import dataclass
-from utils import generer_pseudo, get_initials, get_avatar_color, get_colors
+from utils import generer_pseudo, get_initials, get_avatar_color, get_colors, port, host
 import asyncio
+import httpx
 # import websockets
 
 
@@ -21,8 +22,8 @@ import asyncio
 # --- Modèle simple pour un message
 @dataclass
 class Message:
-	user: str
-	text: str
+	author_display_name: str
+	content: str
 	message_type: str
 
 
@@ -64,14 +65,14 @@ class ChatMessage(ft.Row):
 		)
 
 		# Avatar + contenu du message
-		self.initials = get_initials(self.message.user)
-		self.avatar_color = get_avatar_color(self.message.user, COLORS_LOOKUP)
+		self.initials = get_initials(self.message.author_display_name)
+		self.avatar_color = get_avatar_color(self.message.author_display_name, COLORS_LOOKUP)
 
 		msg_content = ft.Container(
 			content=ft.Column(
 				[
-					ft.Text(message.user, size=12, weight="bold"),
-					ft.Text(message.text),
+					ft.Text(message.author_display_name, size=12, weight="bold"),
+					ft.Text(message.content),
 				],
 				spacing=2,
 			),
@@ -95,7 +96,7 @@ class ChatMessage(ft.Row):
 		return getattr(e, "page", None) or getattr(getattr(e, "control", None), "page", None)
 
 	def open_menu(self, e):
-		print(f"[ChatMessage] open_menu appelé pour : {self.message.text!r}")
+		print(f"[ChatMessage] open_menu appelé pour : {self.message.content!r}")
 
 		page = getattr(e, "page", None) or getattr(e.control, "page", None)
 		if not page:
@@ -118,12 +119,56 @@ class ChatMessage(ft.Row):
 			page.update()
 
 		# log action (ici à remplacer par ta logique métier)
-		print(f"[ChatMessage] Action: {action} sur le message {self.message.text!r}")
+		print(f"[ChatMessage] Action: {action} sur le message {self.message.content!r}")
 
 
 # Vue principale du chat
 async def ChatView(page: ft.Page):
-	storage= ft.SharedPreferences()
+	storage = ft.SharedPreferences()
+
+	room_id = page.session.store.get("current_room_id")
+
+	if not room_id:
+		print("Le salon est introuvable !")
+		await page.push_route("/rooms")
+		page.update()
+
+	# On récupère tous les messages
+	token = await storage.get("cif_token")
+	if not token:
+		await page.push_route("/login")
+
+	# 2. On prépare l'enveloppe (le header)
+	headers = {"Authorization": f"Bearer {token}"}
+
+	# 3. On demande la liste fraîche au serveur
+	try:
+		async with httpx.AsyncClient() as client:
+			response = await client.get(
+				f"http://{host}:{port}/room/{room_id}/messages", headers=headers
+			)
+
+			# Si le jeton est expiré ou invalide (401)
+			if response.status_code == 401:
+				await storage.remove("cif_token")  # On nettoie
+				print("Erreur lors de la récupération des messages !")
+				await page.push_route("/rooms")  # On redirige
+				return
+
+			messages_received = response.json()
+		# VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
+	except httpx.RequestError as ex:
+		print(f"Erreur réseau : {ex}")
+		room_name_input.error = "Serveur injoignable"
+		room_description_input.error = "Serveur injoignable"
+		page.update()
+		return
+	except Exception as e:
+		# En cas de problème réseau par exemple
+		print(f"Erreur de connexion : {e}")
+		await page.push_route("/rooms")
+		return
+
 	# Loading screen
 	loading_screen = ft.Column(
 		[
@@ -177,16 +222,22 @@ async def ChatView(page: ft.Page):
 	)
 
 	async def go_to_rooms(e):
-		await page.push_route(
-			"/rooms"
-		)  # Note: push_route est souvent remplacé par go_async dans les versions récentes
+		await page.session.store.remove("current_room_id")
+		await page.push_route("/rooms")
+		page.update()
 
 	# Réception d'un message via pubsub
 	def on_message(message: Message):
+		m = ChatMessage(message)
 		if message.message_type == "chat_message":
-			m = ChatMessage(message)
 			chat_list.controls.append(m)
 		page.update()
+
+	# On affiche les messages
+	if messages_received:
+		for message_to_show in messages_received:
+			print(type(message_to_show))
+			# on_message(message_to_show)
 
 	page.pubsub.subscribe(on_message)
 
