@@ -99,17 +99,17 @@ class ChatMessage(ft.Column):
 						ft.ListTile(
 							leading=ft.Icon(ft.Icons.FAVORITE_BORDER),
 							title=ft.Text("Liker"),
-							on_click=lambda e: self.close_sheet_and_act(e, "react"),
+							on_click=lambda e: self.action_react(e),
 						),
 						ft.ListTile(
 							leading=ft.Icon(ft.Icons.REPLY),
 							title=ft.Text("Répondre"),
-							on_click=lambda e: self.close_sheet_and_act(e, "reply"),
+							on_click=self.action_reply,
 						),
 						ft.ListTile(
 							leading=ft.Icon(ft.Icons.REPORT_GMAILERRORRED, color=ft.Colors.RED),
 							title=ft.Text("Signaler", color=ft.Colors.RED),
-							on_click=lambda e: self.close_sheet_and_act(e, "report"),
+							on_click=lambda e: self.action_report(e),
 						),
 					],
 				),
@@ -120,7 +120,7 @@ class ChatMessage(ft.Column):
 		self.controls = [
 			ft.Row(
 				[
-					ft.CircleAvatar(content=ft.Text(get_initials(self.message.pseudo))),
+					ft.CircleAvatar(content=ft.Text(get_initials(self.message.pseudo)), bgcolor=get_avatar_color(self.message.pseudo, COLORS_LOOKUP)),
 					ft.GestureDetector(
 						on_long_press=self.open_menu,
 						content=ft.Container(
@@ -141,19 +141,19 @@ class ChatMessage(ft.Column):
 		]
 
 	async def open_menu(self, e):
-		print(f"[ChatMessage] open_menu appelé pour : {self.message.content!r}")
-
 		page = getattr(e, "page", None) or getattr(e.control, "page", None)
 		if not page:
 			return
-
+# 
 		if self.bottom_sheet not in page.overlay:
 			page.overlay.append(self.bottom_sheet)
 			self.bottom_sheet.open = True
 			page.update()
-
+	
 	async def action_reply(self, e):
-		await self._page_ref.close(self.bottom_sheet)
+		self.bottom_sheet.open = False
+		self.page.update()
+		
 		await self.on_reply(self.message)  # Ajout du await ici pour la fonction async
 
 	async def action_report(self, e):
@@ -247,7 +247,7 @@ async def ChatView(page: ft.Page):
 
 	new_message = ft.TextField(
 		hint_text="Écrivez un message...",
-		autofocus=True,
+		autofocus=False,
 		expand=True,
 		min_lines=1,
 		border_radius=20,
@@ -324,15 +324,7 @@ async def ChatView(page: ft.Page):
 		text = new_message.value
 		parent_id = replying_to_message.id if replying_to_message else None
 
-		page.pubsub.send_all(
-			Message(
-				id=1001,
-				pseudo=current_pseudo,
-				content=text,
-				message_type="chat",
-				parent_id=parent_id,
-			)
-		)
+
 		# 3. On demande la liste fraîche au serveur
 		try:
 			async with httpx.AsyncClient() as client:
@@ -355,7 +347,17 @@ async def ChatView(page: ft.Page):
 				new_message.value = ""
 				await new_message.focus()
 				page.update()
-
+				
+				# On envoie le pubsub
+				page.pubsub.send_all(
+					Message(
+						id=1001,
+						pseudo=current_pseudo,
+						content=text,
+						message_type="chat",
+						parent_id=parent_id,
+					)
+				)
 		# VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
 		except httpx.RequestError as ex:
 			print(f"Erreur lors de l'envoi du message : {ex}")

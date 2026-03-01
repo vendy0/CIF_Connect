@@ -69,7 +69,7 @@ def new_user(db: Session, user_data: RegisterRequest):
                     content=f"{user.pseudo} a rejoint le chat !",
                     author_id=user.id,
                     room_id=general_room.id,
-                    message_type="join_message",
+                    message_type="join",
                     author_display_name=user.pseudo,
                 )
                 db.add(welcome_msg)
