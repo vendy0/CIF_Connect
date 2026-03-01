@@ -1,5 +1,6 @@
 import flet as ft
-from utils import generer_pseudo
+from utils import generer_pseudo, host, port
+import httpx
 # from flet_storage import FletStorage
 
 # storage = FletStorage("cif_connect_app")
@@ -43,7 +44,7 @@ async def SettingsView(page: ft.Page):
 	def changer_pseudo(e):
 		# Champ de saisie affichant un nouveau pseudo généré
 		nouveau_pseudo_input = ft.TextField(
-			value=pseudo_display_text,
+			value=pseudo,
 			read_only=True,
 			label="Pseudo suggéré",
 		)
@@ -51,11 +52,57 @@ async def SettingsView(page: ft.Page):
 		async def valider_changement(e):
 			# Mise à jour de la variable globale
 			actuel_pseudo = nouveau_pseudo_input.value
-			# Mise à jour de l'affichage dans la liste sans recharger la page
-			pseudo_display_text.value = actuel_pseudo
-			await storage.set("user_pseudo", actuel_pseudo)
-			dlg.open = False
-			page.update()
+			if actuel_pseudo == pseudo:
+				dlg.open = False
+				page.update()
+				return
+
+			# # Mise à jour de l'affichage dans la liste sans recharger la page
+			# pseudo_display_text.value = actuel_pseudo
+			# await storage.set("user_pseudo", actuel_pseudo)
+			# dlg.open = False
+			# page.update()
+
+			token = await storage.get("cif_token")
+			if not token:
+				await page.push_route("/login")
+
+			# 2. On prépare l'enveloppe (le header)
+			headers = {"Authorization": f"Bearer {token}"}
+
+			# 3. On demande la liste fraîche au serveur
+			try:
+				async with httpx.AsyncClient() as client:
+					response = await client.put(
+						f"http://{host}:{port}/users/pseudo",
+						json={"new_pseudo": actuel_pseudo},
+						headers=headers,
+					)
+
+					if not response.status_code == 200:
+						nouveau_pseudo_input.error = response.json().get(
+							"detail", "Erreur inconnue"
+						)
+						page.update()
+						return
+
+					pseudo_display_text.value = actuel_pseudo
+					await storage.set("user_pseudo", actuel_pseudo)
+					dlg.open = False
+					page.update()
+
+			# VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
+			except httpx.RequestError as ex:
+				print(f"Erreur réseau : {ex}")
+				nouveau_pseudo_input.error = "Serveur injoignable"
+				page.update()
+				return
+
+			except Exception as e:
+				# En cas de problème réseau par exemple
+				print(f"Erreur de connexion : {e}")
+				nouveau_pseudo_input.error = "Erreur inconnue"
+				return
 
 		def generer_un_autre(e):
 			nouveau_pseudo_input.value = generer_pseudo()

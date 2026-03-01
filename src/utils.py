@@ -8,7 +8,8 @@ import string
 import asyncio
 import base64
 import json
-
+host = "127.0.0.1"
+port = "8000"
 
 async def view_pop(view, page):
 	if len(page.views) > 1:
@@ -228,5 +229,6 @@ if __name__ == "__main__":
 	pseudo = generer_pseudo()
 	# 	COLORS_LOOKUP = get_colors()
 	# 	color = get_avatar_color(pseudo, COLORS_LOOKUP)
-	print("Pseudo :", pseudo)
+	# print("Pseudo :", pseudo)
+	print(get_colors())
 # 	print("Couleur :", color)

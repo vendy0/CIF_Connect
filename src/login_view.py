@@ -1,11 +1,10 @@
 import flet as ft
 import httpx
-from utils import generer_pseudo, decode_token
+from utils import generer_pseudo, decode_token, host, port
 from math import pi
 
 async def LoginView(page: ft.Page):
-	host = "127.0.0.1"
-	port = "8000"
+
 
 	is_register_mode = False
 
