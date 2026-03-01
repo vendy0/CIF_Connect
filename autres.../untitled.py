@@ -5,6 +5,9 @@
 - Retirer le host et le port de utils.py et les mettre dans un .env
 - Les loadings.
 - Mettre un publique / private quand on crée une room
+- Premiere lettre en majuscule
+- Délimiteur parent message dans le front
+- Informer par snack bar ou qlq chose de plus stylé
 """
 # - Page de connexion
 # - Le jwt à la place des id dans les requetes.

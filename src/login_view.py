@@ -3,16 +3,19 @@ import httpx
 from utils import generer_pseudo, decode_token, host, port
 from math import pi
 
+
 async def LoginView(page: ft.Page):
-
-
 	is_register_mode = False
 
 	# Dans ton LoginView (Flet 0.80.5)
 	storage = ft.SharedPreferences()
 
 	email_input = ft.TextField(
-		label="Email", prefix_icon=ft.Icons.EMAIL, border_radius=10, multiline=False
+		label="Email",
+		prefix_icon=ft.Icons.EMAIL,
+		border_radius=10,
+		multiline=False,
+		on_submit=lambda e: password_input.focus(),
 	)
 	password_input = ft.TextField(
 		label="Mot de passe",
@@ -21,6 +24,7 @@ async def LoginView(page: ft.Page):
 		can_reveal_password=True,
 		border_radius=10,
 		multiline=False,
+		on_submit=lambda e: confirm_password_input.focus(),
 	)
 	confirm_password_input = ft.TextField(
 		label="Confirmer le mot de passe",
