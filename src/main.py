@@ -6,6 +6,8 @@ from rooms_view import RoomsView
 from create_room_view import CreateRoomView
 from utils import generer_pseudo, view_pop, decode_token
 # import asyncio
+	
+print(" =============== LANCEMENT DE FLET =============== ")
 
 
 async def main(page: ft.Page):
@@ -17,7 +19,7 @@ async def main(page: ft.Page):
 	async def route_change():  # e : ft.RouteChangeEvent):
 		if page.route in ["/login", "/", "/rooms"]:
 			page.views.clear()
-		
+
 		# e.route (ou page.route) contient la route active
 		if page.route == "/login" or page.route == "/":
 			page.views.append(await LoginView(page))
@@ -39,7 +41,6 @@ async def main(page: ft.Page):
 	page.on_view_pop = lambda e: view_pop(e.view, page)
 
 	if await storage.contains_key("cif_token"):
-
 		# On récupère le token
 		token = await storage.get("cif_token")
 

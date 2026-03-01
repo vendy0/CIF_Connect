@@ -82,9 +82,7 @@ class ChatMessage(ft.Column):
 						ft.ListTile(
 							leading=ft.Icon(ft.Icons.FAVORITE_BORDER),
 							title=ft.Text("Liker"),
-							on_click=lambda e: self.action_react(
-								e, "❤️"
-							),  # Ajout de l'emoji par défaut
+							on_click=self.action_react,  # Ajout de l'emoji par défaut
 						),
 						ft.ListTile(
 							leading=ft.Icon(ft.Icons.REPLY),
@@ -171,122 +169,13 @@ class ChatMessage(ft.Column):
 		# self.page.show_dialog(self.bottom_sheet)
 		# self.page.update()
 
-		self.on_report(self.message)
+		await self.on_report(self.message)
 		self.bottom_sheet.open = False
 
-	async def action_react(self, e, emoji):
+	async def action_react(self, e, emoji="❤️"):
 		self.bottom_sheet.open = False
 		self.page.update()
 		await self.on_react(self.message, emoji)
-
-
-# class ChatMessage(ft.Column):
-# 	def __init__(self, message: Message, page: ft.Page, on_reply, on_report, on_react):
-# 		super().__init__()
-# 		self.message = message
-# 		self._page_ref = page
-# 		self.on_reply = on_reply
-# 		self.on_report = on_report
-# 		self.on_react = on_react
-# 		self.spacing = 2
-
-# 		# --- Création du BottomSheet ---
-# 		# self.bottom_sheet = ft.BottomSheet(
-# 		#     content=ft.Container(
-# 		#         padding=20,
-# 		#         content=ft.Column(
-# 		#             tight=True,
-# 		#             controls=[
-# 		#                 ft.Text("Actions", weight="bold"),
-# 		#                 ft.Row(
-# 		#                     [
-# 		#                         # CORRECTION: Utilisation de TextButton pour les emojis
-# 		#                         ft.TextButton(content="👍", on_click=lambda e: self.action_react(e, "👍")),
-# 		#                         ft.TextButton(content="❤️", on_click=lambda e: self.action_react(e, "❤️")),
-# 		#                     ],
-# 		#                     alignment=ft.MainAxisAlignment.CENTER,
-# 		#                 ),
-# 		#                 ft.ListTile(leading=ft.Icon(ft.Icons.REPLY), title=ft.Text("Répondre"), on_click=self.action_reply),
-# 		#                 ft.ListTile(leading=ft.Icon(ft.Icons.REPORT, color="error"), title=ft.Text("Signaler"), on_click=self.action_report),
-# 		#             ],
-# 		#         ),
-# 		#     )
-# 		# )
-
-# 		# BottomSheet (menu)
-# 		self.bottom_sheet = ft.BottomSheet(
-# 			content=ft.Container(
-# 				padding=10,
-# 				content=ft.Column(
-# 					tight=True,
-# 					controls=[
-# 						ft.ListTile(
-# 							leading=ft.Icon(ft.Icons.FAVORITE_BORDER),
-# 							title=ft.Text("Liker"),
-# 							on_click=lambda e: self.action_react(e),
-# 						),
-# 						ft.ListTile(
-# 							leading=ft.Icon(ft.Icons.REPLY),
-# 							title=ft.Text("Répondre"),
-# 							on_click=self.action_reply,
-# 						),
-# 						ft.ListTile(
-# 							leading=ft.Icon(ft.Icons.REPORT_GMAILERRORRED, color=ft.Colors.RED),
-# 							title=ft.Text("Signaler", color=ft.Colors.RED),
-# 							on_click=lambda e: self.action_report(e),
-# 						),
-# 					],
-# 				),
-# 			),
-# 		)
-
-# 		# Avatar et bulles
-# 		self.controls = [
-# 			ft.Row(
-# 				[
-# 					ft.CircleAvatar(content=ft.Text(get_initials(self.message.pseudo)), bgcolor=get_avatar_color(self.message.pseudo, COLORS_LOOKUP)),
-# 					ft.GestureDetector(
-# 						on_long_press=self.open_menu,
-# 						content=ft.Container(
-# 							content=ft.Column(
-# 								[
-# 									ft.Text(self.message.pseudo, weight="bold"),
-# 									ft.Text(self.message.content),
-# 								],
-# 								spacing=2,
-# 							),
-# 							bgcolor="surfacevariant",
-# 							padding=10,
-# 							border_radius=10,
-# 						),
-# 					),
-# 				]
-# 			)
-# 		]
-
-# 	async def open_menu(self, e):
-# 		page = getattr(e, "page", None) or getattr(e.control, "page", None)
-# 		if not page:
-# 			return
-# #
-# 		if self.bottom_sheet not in page.overlay:
-# 			page.overlay.append(self.bottom_sheet)
-# 			self.page.show_dialog(bottom_sheet)
-# 			page.update()
-
-# 	async def action_reply(self, e):
-# 		self.bottom_sheet.open = False
-# 		self.page.update()
-
-# 		await self.on_reply(self.message)  # Ajout du await ici pour la fonction async
-
-# 	async def action_report(self, e):
-# 		await self._page_ref.close(self.bottom_sheet)
-# 		await self.on_report(self.message)
-
-# 	async def action_react(self, e, emoji):
-# 		await self._page_ref.close(self.bottom_sheet)
-# 		await self.on_react(self.message, emoji)
 
 
 # =============================================================================
@@ -404,16 +293,49 @@ async def ChatView(page: ft.Page):
 			msg.reactions[emoji] += 1
 		else:
 			msg.reactions[emoji] = 1
+		page.show_dialog(ft.SnackBar(f"Emoji : {emoji} réagi sur le message {msg.id}"))
 		# (La logique UI sera faite plus tard si tu veux l'afficher)
 
-	def report_message(msg: Message):
+	async def report_message(msg: Message):
 		report_reason_input = ft.TextField(label="Raison du signalement", multiline=True)
 
-		def submit_report(e):
+		async def submit_report(e):
+			if not report_reason_input.value.strip():
+				report_reason_input.error = "Le champ ne doit pas être vide !"
+				return
+			
 			report_dialog.open = False
-			snack_bar = ft.SnackBar(ft.Text("Signalement envoyé à la modération."))
-			page.show_dialog(snack_bar)
-			page.update()
+
+			# 3. On demande la liste fraîche au serveur
+			try:
+				async with httpx.AsyncClient() as client:
+					payload = {"message_id": msg.id, "raison": report_reason_input.value.strip()}
+					response = await client.post(
+						f"http://{host}:{port}/reports", headers=headers, json=payload
+					)
+
+					# Si le jeton est expiré ou invalide (401)
+					if response.status_code != 201:
+						print("Erreur lors du signalement !")
+						report_reason_input.error = "Il y a eu urreur lors du signalement !"
+						return
+
+					snack_bar = ft.SnackBar(ft.Text("Signalement envoyé à la modération."))
+					page.show_dialog(snack_bar)
+					page.update()
+
+			# VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
+			except httpx.RequestError as ex:
+				print(f"Erreur réseau : {ex}")
+				report_reason_input.error = "Serveur injoignable"
+				page.update()
+				return
+			except Exception as e:
+				# En cas de problème réseau par exemple
+				report_reason_input.error = "Erreur de connexion !"
+				page.update()
+				print(f"Erreur de connexion : {e}")
+				return
 
 		def cancel_report(e):
 			report_dialog.open = False

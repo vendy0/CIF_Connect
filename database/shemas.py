@@ -180,7 +180,6 @@ class ReportCreateSchema(BaseModel):
 	NOTE: On ne demande plus reported_id, le back-end le trouvera via le message_id.
 	"""
 
-	reporter_id: int
 	message_id: int  # Obligatoire maintenant pour identifier l'auteur
 	raison: str
 
