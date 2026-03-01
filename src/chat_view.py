@@ -123,6 +123,7 @@ class ChatMessage(ft.Row):
 
 # Vue principale du chat
 async def ChatView(page: ft.Page):
+	storage= ft.SharedPreferences()
 	# Loading screen
 	loading_screen = ft.Column(
 		[
@@ -146,10 +147,7 @@ async def ChatView(page: ft.Page):
 	)
 
 	# Fonction pour "charger" l'historique (simulée)
-	async def load_history():
-		import time
-
-		await time.sleep(1.0)
+	def load_history():
 		container.content = chat_list
 		page.update()
 
@@ -159,7 +157,7 @@ async def ChatView(page: ft.Page):
 
 		page.pubsub.send_all(
 			Message(
-				user=page.session.store.get("pseudo"),
+				user=await storage.get("user_pseudo"),
 				text=new_message.value.strip(),
 				message_type="chat_message",
 			)
@@ -194,7 +192,6 @@ async def ChatView(page: ft.Page):
 
 	# AppBar
 	app_bar = ft.AppBar(
-
 		bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
 		elevation=2,
 		actions=[
