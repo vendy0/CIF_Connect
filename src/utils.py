@@ -74,6 +74,7 @@ class Room:
 
 	async def join_room(self, e):
 		self.page.session.store.set("current_room_id", self.id)
+		self.page.session.store.set("current_room_name", self.name)
 		asyncio.create_task(self.page.push_route(route="/chat"))
 
 

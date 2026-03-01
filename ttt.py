@@ -144,7 +144,7 @@ async def ChatView(page: ft.Page):
     # 3. On demande la liste fraîche au serveur
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(f"http://{host}:{port}/room/{room_id}/messages", headers=headers)
+            response = await client.get(f"http://{host}:{port}/room/{current_room_id}/messages", headers=headers)
 
             # Si le jeton est expiré ou invalide (401)
             if response.status_code == 401:

@@ -115,7 +115,7 @@ class ChatMessage(ft.Column):
 				),
 			),
 		)
-		
+
 		# Avatar et bulles
 		self.controls = [
 			ft.Row(
@@ -139,20 +139,18 @@ class ChatMessage(ft.Column):
 				]
 			)
 		]
-		
-		
+
 	async def open_menu(self, e):
 		print(f"[ChatMessage] open_menu appelé pour : {self.message.content!r}")
-					
+
 		page = getattr(e, "page", None) or getattr(e.control, "page", None)
 		if not page:
 			return
-					
+
 		if self.bottom_sheet not in page.overlay:
 			page.overlay.append(self.bottom_sheet)
 			self.bottom_sheet.open = True
 			page.update()
-
 
 	async def action_reply(self, e):
 		await self._page_ref.close(self.bottom_sheet)
@@ -173,16 +171,57 @@ class ChatMessage(ft.Column):
 
 
 async def ChatView(page: ft.Page):
-	sp = ft.SharedPreferences()
-	token = await sp.get("cif_token")
+	storage = ft.SharedPreferences()
+	token = await storage.get("cif_token")
 
 	current_room_id = page.session.store.get("current_room_id") or 1
-	current_room_name = page.session.store.get("current_room_name") or "Salon Général"
-	current_pseudo = await sp.get("user_pseudo") or "Anonyme"
+	current_room_name = page.session.store.get("current_room_name") or "Salon Inconnue..."
+	current_pseudo = await storage.get("user_pseudo") or "Anonyme"
 
 	replying_to_message: Optional[Message] = None
 
+	if not current_room_id:
+		print("Le salon est introuvable !")
+		await page.push_route("/rooms")
+		page.update()
+
+	if not token:
+		await page.push_route("/login")
+
+	# On récupère tous les messages
+	# 2. On prépare l'enveloppe (le header)
+	headers = {"Authorization": f"Bearer {token}"}
+
 	chat_list = ft.ListView(expand=True, spacing=15, auto_scroll=True, padding=10)
+
+	# 3. On demande la liste fraîche au serveur
+	try:
+		async with httpx.AsyncClient() as client:
+			response = await client.get(
+				f"http://{host}:{port}/room/{current_room_id}/messages", headers=headers
+			)
+
+			# Si le jeton est expiré ou invalide (401)
+			if response.status_code == 401:
+				await storage.remove("cif_token")  # On nettoie
+				print("Erreur lors de la récupération des messages !")
+				await page.push_route("/rooms")  # On redirige
+				return
+
+			messages_received = response.json()
+
+	# VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
+	except httpx.RequestError as ex:
+		print(f"Erreur réseau : {ex}")
+		room_name_input.error = "Serveur injoignable"
+		room_description_input.error = "Serveur injoignable"
+		page.update()
+		return
+	except Exception as e:
+		# En cas de problème réseau par exemple
+		print(f"Erreur de connexion : {e}")
+		await page.push_route("/rooms")
+		return
 
 	reply_banner = ft.Container(
 		visible=False,
@@ -217,6 +256,8 @@ async def ChatView(page: ft.Page):
 	)
 
 	async def go_to_rooms(e):
+		page.session.store.remove("current_room_id")
+		page.session.store.remove("current_room_name")
 		await page.push_route("/rooms")
 
 	async def cancel_reply(e):  # Rendu async pour pouvoir être awaité
@@ -288,10 +329,44 @@ async def ChatView(page: ft.Page):
 				id=1001,
 				pseudo=current_pseudo,
 				content=text,
-				message_type="chat_message",
+				message_type="chat",
 				parent_id=parent_id,
 			)
 		)
+		# 3. On demande la liste fraîche au serveur
+		try:
+			async with httpx.AsyncClient() as client:
+				payload = {"content": new_message.value.strip()}
+				if parent_id:
+					payload["parent_id"] = parent_id
+				response = await client.post(
+					f"http://{host}:{port}/room/{current_room_id}/messages",
+					headers=headers,
+					json=payload,
+				)
+
+				# Si le jeton est expiré ou invalide (401)
+				if response.status_code != 201:
+					print("Erreur lors de l'envoi du message !")
+					new_message.error = "Message non envoyé !"
+					page.update()
+					return
+
+				new_message.value = ""
+				await new_message.focus()
+				page.update()
+
+		# VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
+		except httpx.RequestError as ex:
+			print(f"Erreur lors de l'envoi du message : {ex}")
+			new_message.error = "Erreur, Message non envoyé !"
+			page.update()
+			return
+		except Exception as e:
+			# En cas de problème réseau par exemple
+			print(f"Erreur de connexion : {e}")
+			new_message.error = "Erreur connexion !"
+			return
 
 		new_message.value = ""
 		await cancel_reply(None)
@@ -301,7 +376,7 @@ async def ChatView(page: ft.Page):
 	def on_message(message: Message):
 		if message.message_type in ["join", "quit"]:
 			chat_list.controls.append(SystemMessage(message))
-		elif message.message_type == "chat_message":
+		elif message.message_type == "chat":
 			chat_list.controls.append(
 				ChatMessage(
 					message=message,
@@ -312,6 +387,20 @@ async def ChatView(page: ft.Page):
 				)
 			)
 		page.update()  # Reste synchrone car c'est un callback PubSub
+
+	# On affiche les messages
+	if messages_received:
+		for message_to_show in messages_received:
+			me = Message(
+				id=message_to_show["id"],
+				pseudo=message_to_show["author_display_name"],
+				content=message_to_show["content"],
+				message_type=message_to_show["message_type"],
+				parent_id=message_to_show["parent_id"],
+			)
+			on_message(me)
+	else:
+		pass
 
 	page.pubsub.subscribe(on_message)
 
