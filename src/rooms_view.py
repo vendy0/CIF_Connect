@@ -11,10 +11,8 @@ async def RoomsView(page: ft.Page):
     # 1. On récupère le badge de sécurité (le token)
     sp = ft.SharedPreferences()
     token = await sp.get("cif_token")
-    # values = await sp.get_keys("")
-
-    # for key in values:
-    #     print(key)
+    if not token:
+    	await page.push_route("/login")
 
     # 2. On prépare l'enveloppe (le header)
     headers = {"Authorization": f"Bearer {token}"}
@@ -27,6 +25,7 @@ async def RoomsView(page: ft.Page):
             # Si le jeton est expiré ou invalide (401)
             if response.status_code == 401:
                 await sp.remove("cif_token")  # On nettoie
+                print("Erreur lors de la récupération des rooms !")
                 await page.push_route("/login")  # On redirige
                 return
 
@@ -72,6 +71,7 @@ async def RoomsView(page: ft.Page):
         route="/rooms",
         appbar=ft.AppBar(
             title=ft.Text("Mes Salons"),
+            automatically_imply_leading=False,
             actions=[
                 ft.IconButton(ft.Icons.SETTINGS, on_click=go_to_settings),
             ],

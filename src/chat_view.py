@@ -194,12 +194,24 @@ async def ChatView(page: ft.Page):
 
 	# AppBar
 	app_bar = ft.AppBar(
-		leading=ft.Icon(ft.Icons.FORUM_ROUNDED),
+
+		bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
+		elevation=2,
+		actions=[
+			ft.IconButton(ft.Icons.LOGOUT_ROUNDED, tooltip="Retour", on_click=go_to_rooms),
+			# ft.PopupMenuButton(  # Un petit menu "trois points" pour faire pro
+			# 	items=[
+			# 		ft.PopupMenuItem(icon=ft.Icons.INFO_OUTLINE, text="Infos du salon"),
+			# 		ft.PopupMenuItem(icon=ft.Icons.NOTIFICATIONS_OFF_OUTLINED, text="Muer"),
+			# 	]
+			# ),
+		],
+		leading=ft.Icon(ft.Icons.FORUM_ROUNDED, color=ft.Colors.PRIMARY),
 		leading_width=40,
-		title=ft.Text("Salon Général"),
+		title=ft.Text(
+			"Salon Général", size=20, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE
+		),
 		center_title=True,
-		bgcolor=ft.Colors.DEEP_PURPLE_700,
-		actions=[ft.IconButton(ft.Icons.LOGOUT, tooltip="Retour", on_click=go_to_rooms)],
 	)
 
 	# Lancer le chargement (non-bloquant depuis la page principale)
