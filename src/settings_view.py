@@ -79,7 +79,7 @@ async def SettingsView(page: ft.Page):
 						headers=headers,
 					)
 
-					if not response.status_code == 200:
+					if response.status_code != 200:
 						nouveau_pseudo_input.error = response.json().get(
 							"detail", "Erreur inconnue"
 						)

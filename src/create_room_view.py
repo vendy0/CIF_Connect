@@ -1,8 +1,10 @@
 import flet as ft
-from utils import Room, rooms, generate_secure_code
+from utils import generate_secure_code, host, port
+import httpx
 
 
 async def CreateRoomView(page: ft.Page):
+	storage = ft.SharedPreferences()
 	# ==========================================================
 	#                         STATE
 	# ==========================================================
@@ -114,16 +116,57 @@ async def CreateRoomView(page: ft.Page):
 			room_description_input.error = "Champ obligatoire."
 
 		if name and desc:
-			new_room = Room(
-				page,
-				len(rooms),
-				name,
-				desc,
-				icon=state["selected_icon"],
-				code=generate_secure_code(),
-			)
-			rooms.append(new_room)
-			await page.push_route("/rooms")
+			token = await storage.get("cif_token")
+			if not token:
+				await page.push_route("/login")
+
+			# 2. On prépare l'enveloppe (le header)
+			headers = {"Authorization": f"Bearer {token}"}
+			payload = {
+				"name": name,
+				"description": desc,
+				"icon": state["selected_icon"],
+			}
+
+			# 3. On demande la liste fraîche au serveur
+			try:
+				async with httpx.AsyncClient() as client:
+					response = await client.post(
+						f"http://{host}:{port}/rooms",
+						json=payload,
+						headers=headers,
+					)
+
+					if response.status_code != 201:
+						room_name_input.error = response.json().get("detail", "Erreur inconnue")
+						page.update()
+						return
+
+					await page.push_route("/rooms")
+
+			# VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
+			except httpx.RequestError as ex:
+				print(f"Erreur réseau : {ex}")
+				room_name_input.error = "Serveur injoignable"
+				room_description_input.error = "Serveur injoignable"
+				page.update()
+				return
+
+			except Exception as e:
+				# En cas de problème réseau par exemple
+				print(f"Erreur de connexion : {e}")
+				room_name_input.error = "Erreur inconnue"
+				room_description_input.error = "Erreur inconnue"
+				return
+			# 	new_room = Room(
+			# 		page,
+			# 		len(rooms),
+			# 		name,
+			# 		desc,
+			# 		icon=state["selected_icon"],
+			# 		code=generate_secure_code(),
+			# 	)
+			# 	rooms.append(new_room)
 
 		page.update()
 
@@ -161,7 +204,7 @@ async def CreateRoomView(page: ft.Page):
 			bgcolor=ft.Colors.SURFACE_CONTAINER_HIGH,
 			content=ft.Column(
 				scroll=ft.ScrollMode.HIDDEN,
-				tight=true,
+				tight=True,
 				spacing=20,
 				controls=[
 					# Titre
