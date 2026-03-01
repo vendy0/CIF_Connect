@@ -87,7 +87,6 @@ class MessageCreate(BaseModel):
 	"""Payload pour envoyer un message"""
 
 	content: str
-	author_id: int
 	parent_id: Optional[int] = None
 
 
