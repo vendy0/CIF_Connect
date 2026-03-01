@@ -1,302 +1,271 @@
 import flet as ft
-from dataclasses import dataclass
-from utils import get_initials, get_avatar_color, get_colors, port, host
-import asyncio
+from dataclasses import dataclass, field
+from typing import List, Optional
 import httpx
-# import websockets
+from utils import get_initials, get_avatar_color, get_colors, host, port
+
+# =============================================================================
+# 1. MODÈLES DE DONNÉES
+# =============================================================================
 
 
-# async def ChatView(page: ft.Page):
-#     # L'URL de ton serveur FastAPI
-#     uri = "ws://localhost:8000/chat"
-
-#     # On tente de se connecter
-#     try:
-#         websocket = await websockets.connect(uri)
-#         # Une fois connecté, on peut envoyer les infos de l'élève
-#         # (pseudo, etc.) pour que le serveur l'enregistre dans son dict.
-#     except Exception as e:
-#         print(f"Erreur de connexion : {e}")
-
-
-# --- Modèle simple pour un message
 @dataclass
 class Message:
+    id: int
     pseudo: str
     content: str
     message_type: str
+    parent_id: Optional[int] = None
+    reactions: dict = field(default_factory=dict)
 
 
-# Couleurs / utilitaires
 COLORS_LOOKUP = get_colors()
 
+# =============================================================================
+# 2. COMPOSANTS VISUELS DES MESSAGES
+# =============================================================================
 
-class ChatMessage(ft.Row):
+
+class SystemMessage(ft.Row):
     def __init__(self, message: Message):
         super().__init__()
-        self.message = message
-        self.vertical_alignment = ft.CrossAxisAlignment.START
+        self.alignment = ft.MainAxisAlignment.CENTER
 
-        # BottomSheet (menu)
+        color = ft.Colors.GREEN_600 if message.message_type == "join" else ft.Colors.ERROR
+        icon = ft.Icons.LOGIN_ROUNDED if message.message_type == "join" else ft.Icons.LOGOUT_ROUNDED
+
+        self.controls = [
+            ft.Container(
+                content=ft.Row(
+                    [
+                        ft.Icon(icon, size=14, color=color),
+                        ft.Text(
+                            message.content,
+                            italic=True,
+                            size=12,
+                            color=ft.Colors.ON_SURFACE_VARIANT,
+                        ),
+                    ],
+                    tight=True,
+                    spacing=5,
+                ),
+                bgcolor="surfacecontainerhighest",  # Syntaxe sécurisée
+                padding=ft.padding.symmetric(horizontal=12, vertical=6),
+                border_radius=15,
+            )
+        ]
+
+
+class ChatMessage(ft.Column):
+    def __init__(self, message: Message, page: ft.Page, on_reply, on_report, on_react):
+        super().__init__()
+        self.message = message
+        self._page_ref = page
+        self.on_reply = on_reply
+        self.on_report = on_report
+        self.on_react = on_react
+        self.spacing = 2
+
+        # --- Création du BottomSheet ---
         self.bottom_sheet = ft.BottomSheet(
             content=ft.Container(
-                padding=10,
+                padding=20,
                 content=ft.Column(
                     tight=True,
                     controls=[
-                        ft.ListTile(
-                            leading=ft.Icon(ft.Icons.FAVORITE_BORDER),
-                            title=ft.Text("Liker"),
-                            on_click=lambda e: self.close_sheet_and_act(e, "react"),
+                        ft.Text("Actions", weight="bold"),
+                        ft.Row(
+                            [
+                                # CORRECTION: Utilisation de TextButton pour les emojis
+                                ft.TextButton(content="👍", on_click=lambda e: self.action_react(e, "👍")),
+                                ft.TextButton(content="❤️", on_click=lambda e: self.action_react(e, "❤️")),
+                            ],
+                            alignment=ft.MainAxisAlignment.CENTER,
                         ),
-                        ft.ListTile(
-                            leading=ft.Icon(ft.Icons.REPLY),
-                            title=ft.Text("Répondre"),
-                            on_click=lambda e: self.close_sheet_and_act(e, "reply"),
-                        ),
-                        ft.ListTile(
-                            leading=ft.Icon(ft.Icons.REPORT_GMAILERRORRED, color=ft.Colors.RED),
-                            title=ft.Text("Signaler", color=ft.Colors.RED),
-                            on_click=lambda e: self.close_sheet_and_act(e, "report"),
-                        ),
+                        ft.ListTile(leading=ft.Icon(ft.Icons.REPLY), title=ft.Text("Répondre"), on_click=self.action_reply),
+                        ft.ListTile(leading=ft.Icon(ft.Icons.REPORT, color="error"), title=ft.Text("Signaler"), on_click=self.action_report),
                     ],
                 ),
-            ),
-        )
-
-        # Avatar + contenu du message
-        self.initials = get_initials(self.message.pseudo)
-        self.avatar_color = get_avatar_color(self.message.pseudo, COLORS_LOOKUP)
-
-        msg_content = ft.Container(
-            content=ft.Column(
-                [
-                    ft.Text(message.pseudo, size=12, weight="bold"),
-                    ft.Text(message.content),
-                ],
-                spacing=2,
-            ),
-            padding=10,
-            bgcolor=ft.Colors.SURFACE_CONTAINER,
-            border_radius=15,
-        )
-
-        # GestureDetector : on_long_press pour mobile, on_secondary_tap pour bureau
-        self.controls = [
-            ft.CircleAvatar(content=ft.Text(self.initials), bgcolor=self.avatar_color),
-            ft.GestureDetector(
-                content=msg_content,
-                on_long_press=self.open_menu,  # <-- changement important
-                on_secondary_tap=self.open_menu,  # clic droit / secondary tap (desktop)
-            ),
-        ]
-
-    def _get_event_page(self, e):
-        # récupération robuste de la page depuis l'événement
-        return getattr(e, "page", None) or getattr(getattr(e, "control", None), "page", None)
-
-    def open_menu(self, e):
-        print(f"[ChatMessage] open_menu appelé pour : {self.message.content!r}")
-
-        page = getattr(e, "page", None) or getattr(e.control, "page", None)
-        if not page:
-            return
-
-        if self.bottom_sheet not in page.overlay:
-            page.overlay.append(self.bottom_sheet)
-
-        self.bottom_sheet.open = True
-        page.update()
-
-    def close_sheet_and_act(self, e, action):
-        page = self._get_event_page(e)
-        # fermer le sheet
-        try:
-            self.bottom_sheet.open = False
-        except Exception:
-            pass
-        if page:
-            page.update()
-
-        # log action (ici à remplacer par ta logique métier)
-        print(f"[ChatMessage] Action: {action} sur le message {self.message.content!r}")
-
-
-# Vue principale du chat
-async def ChatView(page: ft.Page):
-    storage = ft.SharedPreferences()
-
-    room_id = page.session.store.get("current_room_id")
-
-    if not room_id:
-        print("Le salon est introuvable !")
-        await page.push_route("/rooms")
-        page.update()
-
-    # On récupère tous les messages
-    token = await storage.get("cif_token")
-    if not token:
-        await page.push_route("/login")
-
-    # 2. On prépare l'enveloppe (le header)
-    headers = {"Authorization": f"Bearer {token}"}
-
-    # 3. On demande la liste fraîche au serveur
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"http://{host}:{port}/room/{room_id}/messages", headers=headers)
-
-            # Si le jeton est expiré ou invalide (401)
-            if response.status_code == 401:
-                await storage.remove("cif_token")  # On nettoie
-                print("Erreur lors de la récupération des messages !")
-                await page.push_route("/rooms")  # On redirige
-                return
-
-            messages_received = response.json()
-        # VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
-    except httpx.RequestError as ex:
-        print(f"Erreur réseau : {ex}")
-        room_name_input.error = "Serveur injoignable"
-        room_description_input.error = "Serveur injoignable"
-        page.update()
-        return
-    except Exception as e:
-        # En cas de problème réseau par exemple
-        print(f"Erreur de connexion : {e}")
-        await page.push_route("/rooms")
-        return
-
-    # Loading screen
-    loading_screen = ft.Column(
-        [
-            ft.ProgressBar(width=400),
-            ft.Text("Chargement des messages...", italic=True),
-        ],
-        horizontal_alignment="center",
-    )
-
-    container = ft.Container(
-        content=loading_screen,
-        expand=True,
-        alignment=ft.Alignment.CENTER,
-    )
-
-    # ListView qui contiendra les messages
-    chat_list = ft.ListView(
-        expand=True,
-        spacing=10,
-        auto_scroll=True,
-    )
-
-    # Fonction pour "charger" l'historique (simulée)
-    def load_history():
-        container.content = chat_list
-        page.update()
-
-    async def send_click(e):
-        parent_id = None
-        if not new_message.value:
-            return
-
-        page.pubsub.send_all(
-            Message(
-                pseudo=await storage.get("user_pseudo"),
-                content=new_message.value.strip(),
-                message_type="chat",
             )
         )
 
-        # 3. On demande la liste fraîche au serveur
-        try:
-            async with httpx.AsyncClient() as client:
-                payload = {"content": new_message.value.strip()}
+        # Avatar et bulles
+        self.controls = [
+            ft.Row(
+                [
+                    ft.CircleAvatar(content=ft.Text(get_initials(self.message.pseudo))),
+                    ft.GestureDetector(
+                        on_long_press=self.open_menu,
+                        content=ft.Container(
+                            content=ft.Column(
+                                [
+                                    ft.Text(self.message.pseudo, weight="bold"),
+                                    ft.Text(self.message.content),
+                                ],
+                                spacing=2,
+                            ),
+                            bgcolor="surfacevariant",
+                            padding=10,
+                            border_radius=10,
+                        ),
+                    ),
+                ]
+            )
+        ]
 
-                if parent_id:
-                    payload["parent_id"] = parent_id
-                response = await client.post(f"http://{host}:{port}/room/{room_id}/messages", headers=headers, json=payload)
+    async def open_menu(self, e):
+        await self._page_ref.open(self.bottom_sheet)
 
-                # Si le jeton est expiré ou invalide (401)
-                if response.status_code != 201:
-                    print("Erreur lors de l'envoi du message !")
-                    new_message.error = "Message non envoyé !"
-                    page.update()
-                    return
+    async def action_reply(self, e):
+        await self._page_ref.close(self.bottom_sheet)
+        await self.on_reply(self.message)  # Ajout du await ici pour la fonction async
 
-                new_message.value = ""
-                await new_message.focus()
-                page.update()
+    async def action_report(self, e):
+        await self._page_ref.close(self.bottom_sheet)
+        await self.on_report(self.message)
 
-            # VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
-        except httpx.RequestError as ex:
-            print(f"Erreur lors de l'envoi du message : {ex}")
-            new_message.error = "Erreur, Message non envoyé !"
-            page.update()
-            return
-        except Exception as e:
-            # En cas de problème réseau par exemple
-            print(f"Erreur de connexion : {e}")
-            new_message.error = "Erreur connexion !"
-            return
+    async def action_react(self, e, emoji):
+        await self._page_ref.close(self.bottom_sheet)
+        await self.on_react(self.message, emoji)
+
+
+# =============================================================================
+# 3. VUE PRINCIPALE DU CHAT
+# =============================================================================
+
+
+async def ChatView(page: ft.Page):
+    sp = ft.SharedPreferences()
+    token = await sp.get("cif_token")
+
+    current_room_id = page.session.store.get("current_room_id") or 1
+    current_room_name = page.session.store.get("current_room_name") or "Salon Général"
+    current_pseudo = await sp.get("user_pseudo") or "Anonyme"
+
+    replying_to_message: Optional[Message] = None
+
+    chat_list = ft.ListView(expand=True, spacing=15, auto_scroll=True, padding=10)
+
+    reply_banner = ft.Container(
+        visible=False,
+        bgcolor="surfacevariant",
+        padding=10,
+        border_radius=ft.border_radius.only(top_left=15, top_right=15),
+        content=ft.Row(
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            controls=[
+                ft.Column(
+                    spacing=0,
+                    controls=[
+                        ft.Text("Réponse à", size=11, color="primary"),
+                        ft.Text("", size=13, italic=True, no_wrap=True),
+                    ],
+                ),
+                ft.IconButton(ft.Icons.CLOSE, icon_size=16, on_click=lambda e: cancel_reply(e)),  # Sera awaité plus tard
+            ],
+        ),
+    )
 
     new_message = ft.TextField(
         hint_text="Écrivez un message...",
-        filled=True,
+        autofocus=True,
         expand=True,
         min_lines=1,
         border_radius=20,
         shift_enter=True,
-        on_submit=send_click,
+        on_submit=lambda e: send_click(e),  # Sera awaité via le framework Flet
     )
 
     async def go_to_rooms(e):
-        page.session.store.remove("current_room_id")
         await page.push_route("/rooms")
+
+    async def cancel_reply(e):  # Rendu async pour pouvoir être awaité
+        nonlocal replying_to_message
+        replying_to_message = None
+        reply_banner.visible = False
+        reply_banner.content.controls[0].controls[1].value = ""
         page.update()
 
-    # Réception d'un message via pubsub
+    async def prepare_reply(msg: Message):  # Rendu async
+        nonlocal replying_to_message
+        replying_to_message = msg
+        reply_banner.visible = True
+        reply_banner.content.controls[0].controls[1].value = f"{msg.pseudo}: {msg.content[:30]}..."
+        await new_message.focus()  # CORRECTION DU WARNING ICI
+        page.update()
+
+    async def react_to_message(msg: Message, emoji: str):
+        if emoji in msg.reactions:
+            msg.reactions[emoji] += 1
+        else:
+            msg.reactions[emoji] = 1
+        # (La logique UI sera faite plus tard si tu veux l'afficher)
+
+    async def report_message(msg: Message):
+        report_reason_input = ft.TextField(label="Raison du signalement", multiline=True)
+
+        async def submit_report(e):
+            print(f"Signalement envoyé pour le message {msg.id}: {report_reason_input.value}")
+            await page.close(report_dialog)
+            page.snack_bar = ft.SnackBar(ft.Text("Signalement envoyé à la modération."))
+            page.snack_bar.open = True
+            page.update()
+
+        async def cancel_report(e):
+            await page.close(report_dialog)
+
+        report_dialog = ft.AlertDialog(
+            title=ft.Text("Signaler ce message"),
+            content=ft.Column(tight=True, controls=[ft.Text(f"Message de {msg.pseudo} :"), ft.Text(f'"{msg.content}"', italic=True), report_reason_input]),
+            actions=[
+                ft.TextButton(content="Annuler", on_click=cancel_report),
+                ft.ElevatedButton("Envoyer", bgcolor=ft.Colors.ERROR, color=ft.Colors.WHITE, on_click=submit_report),
+            ],
+        )
+        await page.open(report_dialog)
+
+    async def send_click(e):
+        if not new_message.value:
+            return
+
+        text = new_message.value
+        parent_id = replying_to_message.id if replying_to_message else None
+
+        page.pubsub.send_all(Message(id=1001, pseudo=current_pseudo, content=text, message_type="chat_message", parent_id=parent_id))
+
+        new_message.value = ""
+        await cancel_reply(None)
+        await new_message.focus()  # CORRECTION DU WARNING ICI
+        page.update()
+
     def on_message(message: Message):
-        m = ChatMessage(message)
-        if message.message_type == "chat":
-            chat_list.controls.append(m)
-        page.update()
-
-    # On affiche les messages
-    if messages_received:
-        for message_to_show in messages_received:
-            me = Message(
-                pseudo=message_to_show["author_display_name"],
-                content=message_to_show["content"],
-                message_type=message_to_show["message_type"],
+        if message.message_type in ["join", "quit"]:
+            chat_list.controls.append(SystemMessage(message))
+        elif message.message_type == "chat_message":
+            chat_list.controls.append(
+                ChatMessage(
+                    message=message,
+                    page=page,
+                    on_reply=prepare_reply,
+                    on_report=report_message,
+                    on_react=react_to_message,
+                )
             )
-            on_message(me)
+        page.update()  # Reste synchrone car c'est un callback PubSub
 
     page.pubsub.subscribe(on_message)
 
-    # AppBar
     app_bar = ft.AppBar(
-        bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
+        leading=ft.Icon(ft.Icons.FORUM_ROUNDED, color="primary"),
+        leading_width=40,
+        title=ft.Text(current_room_name, size=20, weight="bold", color="onsurface"),
+        center_title=False,
+        bgcolor="surface",
         elevation=2,
         actions=[
-            ft.IconButton(ft.Icons.LOGOUT_ROUNDED, tooltip="Retour", on_click=go_to_rooms),
-            # ft.PopupMenuButton(  # Un petit menu "trois points" pour faire pro
-            # 	items=[
-            # 		ft.PopupMenuItem(icon=ft.Icons.INFO_OUTLINE, text="Infos du salon"),
-            # 		ft.PopupMenuItem(icon=ft.Icons.NOTIFICATIONS_OFF_OUTLINED, text="Muer"),
-            # 	]
-            # ),
+            ft.IconButton(icon=ft.Icons.LOGOUT_ROUNDED, icon_color="error", tooltip="Quitter le salon", on_click=go_to_rooms),
         ],
-        leading=ft.Icon(ft.Icons.FORUM_ROUNDED, color=ft.Colors.PRIMARY),
-        leading_width=40,
-        title=ft.Text("Salon Général", size=20, weight=ft.FontWeight.W_600, color=ft.Colors.ON_SURFACE),
-        center_title=True,
     )
-
-    # Lancer le chargement (non-bloquant depuis la page principale)
-    # note: si tu déclenches load_history ici, attention au thread blocking dans ton app réelle
-    # on peut l'appeler via page.session_future ou similaire si nécessaire.
-    # Pour test rapide on l'appelle normalement (bloquant simulé)
-    load_history()
 
     return ft.View(
         route="/chat",
@@ -308,18 +277,24 @@ async def ChatView(page: ft.Page):
                 expand=True,
             ),
             ft.Container(
-                content=ft.Row(
-                    [
-                        new_message,
-                        ft.IconButton(
-                            icon=ft.Icons.SEND_ROUNDED,
-                            icon_color=ft.Colors.BLUE_600,
-                            tooltip="Envoyer",
-                            on_click=send_click,
+                content=ft.Column(
+                    spacing=0,
+                    controls=[
+                        reply_banner,
+                        ft.Row(
+                            [
+                                new_message,
+                                ft.IconButton(
+                                    icon=ft.Icons.SEND_ROUNDED,
+                                    icon_color="blue",
+                                    tooltip="Envoyer",
+                                    on_click=send_click,
+                                ),
+                            ]
                         ),
-                    ]
+                    ],
                 ),
-                padding=ft.padding.Padding.only(left=10, right=10, bottom=10),
+                padding=ft.padding.Padding(left=10, top=5, right=10, bottom=15),
             ),
         ],
     )
