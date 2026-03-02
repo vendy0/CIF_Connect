@@ -8,6 +8,9 @@ import string
 import asyncio
 import base64
 import json
+from datetime import datetime, timedelta, date
+import httpx
+from typing import Optional
 
 host = "127.0.0.1"
 port = "8000"
@@ -63,6 +66,31 @@ class Room:
 		asyncio.create_task(self.page.push_route(route="/chat"))
 
 
+host = "127.0.0.1"  # Ton IP
+port = 8000
+
+
+class APIClient:
+	def __init__(self):
+		# Initialise un client persistant
+		self.client = httpx.AsyncClient(base_url=f"http://{host}:{port}")
+		self.token: Optional[str] = None
+
+	def set_token(self, token: str):
+		self.token = token
+		self.client.headers.update({"Authorization": f"Bearer {token}"})
+
+	async def get(self, endpoint: str):
+		return await self.client.get(endpoint)
+
+	async def post(self, endpoint: str, data: dict):
+		return await self.client.post(endpoint, json=data)
+
+
+# On instancie un client unique qui sera importé partout
+api = APIClient()
+
+
 async def show_top_toast(page: ft.Page, message: str, is_error: bool = False):
 	color = ft.Colors.RED_600 if is_error else ft.Colors.GREEN_600
 
@@ -92,6 +120,38 @@ async def show_top_toast(page: ft.Page, message: str, is_error: bool = False):
 	await asyncio.sleep(0.3)  # Temps de l'animation
 	page.overlay.remove(toast)
 	page.update()
+
+
+def format_date(date_to_format: datetime):
+	day = date_to_format.strftime("%d")
+
+	day_diff = int(date.today().strftime("%d")) - int(day)
+	if day_diff == 0:
+		return "Aujourd'hui"
+	elif day_diff == 1:
+		return "Hier"
+
+	month_dict = {
+		1: "Janvier",
+		2: "Février",
+		3: "Mars",
+		4: "Avril",
+		5: "Mai",
+		6: "Juin",
+		7: "Juillet",
+		8: "Août",
+		9: "Septembre",
+		10: "Octobre",
+		11: "Novembre",
+		12: "Décembre",
+	}
+
+	month_number = date_to_format.strftime("%m")
+	year = date_to_format.strftime("%Y")
+
+	month_name = month_dict[int(month_number)]
+
+	return f"{int(day)} {month_name} {int(year)}"
 
 
 def load_json_file(filename):
@@ -214,28 +274,3 @@ async def shake(control: ft.Control, page: ft.Page):
 		control.offset = ft.Offset(x, 0)
 		control.update()
 		await asyncio.sleep(0.03)  # vitesse du shake
-
-
-# if __name__ == "__main__":
-# 	print()
-# 	for i in range(1,100):
-# 		print(f"\n{generer_pseudo()}")
-# print(Path("./src/chat.py").exists())
-# load_json_file("ft_cols.json")
-# get_avatar_color("SansDetermin108", get_colors())
-
-# async def view_pop(e):
-#     if e.view is not None:
-#         print("View pop:", e.view)
-#         page.views.remove(e.view)
-#         top_view = page.views[-1]
-#         await page.push_route(top_view.route)
-# pass
-
-if __name__ == "__main__":
-	pseudo = generer_pseudo()
-	# 	COLORS_LOOKUP = get_colors()
-	# 	color = get_avatar_color(pseudo, COLORS_LOOKUP)
-	# print("Pseudo :", pseudo)
-	print(get_colors())
-# 	print("Couleur :", color)

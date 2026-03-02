@@ -328,9 +328,6 @@ def create_report(db: Session, report_data: ReportCreateSchema, reporter_id: int
 		raise HTTPException(status_code=500, detail="Erreur lors du signalement")
 
 
-# --- NOUVELLES FONCTIONS DE MODÉRATION (MANQUANTES) ---
-
-
 def get_all_reports(db: Session):
 	"""Récupère tous les signalements avec les relations chargées (pour l'admin)."""
 	stmt = (
@@ -343,9 +340,6 @@ def get_all_reports(db: Session):
 		.order_by(Report.created_at.desc())
 	)
 	return db.execute(stmt).scalars().all()
-
-
-from datetime import timedelta  # N'oublie pas d'importer ça en haut du fichier si besoin
 
 
 def process_report_resolution(db: Session, report_id: int, resolution_data: ReportResolutionSchema):

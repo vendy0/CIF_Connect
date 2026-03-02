@@ -1,4 +1,5 @@
 """
+- Connexion avec email et vérification
 - Boite de dialogue de bienvenue
 - Quand qlq'un change de pseudo faut l'avertir que ça se verra dans les rooms créés.
 - Le "Membre depuis"
@@ -7,8 +8,9 @@
 - Mettre un publique / private quand on crée une room
 - Premiere lettre en majuscule
 - Délimiteur parent message dans le front
-- Informer par snack bar ou qlq chose de plus stylé
+# - Changer les print pour utiliser des barres d'infos
 """
+# - Informer par snack bar ou qlq chose de plus stylé
 # - Page de connexion
 # - Le jwt à la place des id dans les requetes.
 

@@ -1,8 +1,18 @@
 import flet as ft
 from dataclasses import dataclass, field
 from typing import List, Optional
+from datetime import datetime, date, time
 import httpx
-from utils import get_initials, get_avatar_color, get_colors, host, port, show_top_toast
+from utils import (
+	get_initials,
+	get_avatar_color,
+	get_colors,
+	host,
+	port,
+	show_top_toast,
+	format_date,
+	api,
+)
 
 
 # =============================================================================
@@ -16,8 +26,11 @@ class Message:
 	pseudo: str
 	content: str
 	message_type: str
+	message_date: date
+	message_time: time
 	parent_id: Optional[int] = None
 	parent_content: Optional[str] = None
+	parent_author: Optional[str] = None
 	reactions: dict = field(default_factory=dict)
 
 
@@ -56,9 +69,6 @@ class SystemMessage(ft.Row):
 				border_radius=15,
 			)
 		]
-
-
-# (Votre dataclass Message et vos fonctions get_colors, get_initials, etc. restent inchangés)
 
 
 class ChatMessage(ft.Column):
@@ -103,23 +113,55 @@ class ChatMessage(ft.Column):
 		bubble_content = []
 
 		# 1. Indicateur de réponse (ajouté uniquement si parent_id existe)
-		if self.message.parent_id is not None:
+		if self.message.parent_content and self.message.parent_author:
+			# bubble_content.append(
+			# 	ft.Container(
+			# 		content=ft.Row(
+			# 			[
+			# 				ft.Icon(ft.Icons.REPLY_ALL_ROUNDED, size=14, color=ft.Colors.OUTLINE),
+			# 				ft.Text("Réponse", size=12, italic=True, color=ft.Colors.OUTLINE),
+			# 			],
+			# 			tight=True,
+			# 			spacing=4,
+			# 		),
+			# 		padding=ft.padding.only(left=8, bottom=2),
+			# 		border=ft.border.only(left=ft.border.BorderSide(2, ft.Colors.OUTLINE)),
+			# 		margin=ft.margin.only(bottom=4),
+			# 	)
+			# )
+
 			bubble_content.append(
 				ft.Container(
-					content=ft.Row(
-						[
-							ft.Icon(ft.Icons.REPLY_ALL_ROUNDED, size=14, color=ft.Colors.OUTLINE),
-							ft.Text("Réponse", size=12, italic=True, color=ft.Colors.OUTLINE),
+					ft.Row(
+						controls=[
+							ft.Text(
+								f"{self.message.parent_author} : ",
+								weight="bold",
+								color=ft.Colors.ON_SURFACE_VARIANT,
+								size=12,
+								no_wrap=True,
+								overflow=ft.TextOverflow.ELLIPSIS,
+							),
+							ft.Text(
+								self.message.parent_content,
+								color=ft.Colors.ON_SURFACE_VARIANT,
+								size=12,
+								no_wrap=True,
+								overflow=ft.TextOverflow.ELLIPSIS,
+							),
 						],
-						tight=True,
-						spacing=4,
+						spacing=0,
 					),
-					padding=ft.padding.only(left=8, bottom=2),
-					border=ft.border.only(left=ft.border.BorderSide(2, ft.Colors.OUTLINE)),
-					margin=ft.margin.only(bottom=4),
-				)
+					bgcolor=ft.Colors.SURFACE,  # Couleur de fond différente
+					# border_left=ft.BorderSide(
+					# 	4, ft.Colors.PRIMARY
+					# ),  # Ligne de couleur sur le côté gauche
+					border=ft.border.only(left=ft.border.BorderSide(4, ft.Colors.OUTLINE)),
+					padding=ft.padding.all(5),
+					border_radius=ft.border_radius.all(4),
+					width=200,  # Adapte selon ton UI
+				),
 			)
-
 		# 2. Ajout du pseudo et du message
 		bubble_content.extend(
 			[
@@ -153,9 +195,8 @@ class ChatMessage(ft.Column):
 		page = getattr(e, "page", None) or getattr(e.control, "page", None)
 		if not page:
 			return
-		#
+
 		if not self.bottom_sheet.open:
-			# page.overlay.append(self.bottom_sheet)
 			self.page.show_dialog(self.bottom_sheet)
 			page.update()
 
@@ -163,16 +204,13 @@ class ChatMessage(ft.Column):
 		self.bottom_sheet.open = False
 		self.page.update()
 
-		await self.on_reply(self.message)  # Ajout du await ici pour la fonction async
+		await self.on_reply(self.message)
 
 	async def action_report(self, e):
-		# self.page.show_dialog(self.bottom_sheet)
-		# self.page.update()
-
 		await self.on_report(self.message)
 		self.bottom_sheet.open = False
 
-	async def action_react(self, e, emoji="❤️"):
+	async def action_react(self, e):
 		self.bottom_sheet.open = False
 		self.page.update()
 		await self.on_react(e, self.message.id)
@@ -184,6 +222,7 @@ class ChatMessage(ft.Column):
 
 
 async def ChatView(page: ft.Page):
+	# last_date Pour afficher une division si il y a changement de jour
 	storage = ft.SharedPreferences()
 	token = await storage.get("cif_token")
 
@@ -204,24 +243,44 @@ async def ChatView(page: ft.Page):
 	# On récupère tous les messages
 	# 2. On prépare l'enveloppe (le header)
 	headers = {"Authorization": f"Bearer {token}"}
+	# Le bouton (caché par défaut)
+	scroll_btn = ft.FloatingActionButton(
+		icon=ft.Icons.ARROW_DOWNWARD,
+		visible=False,
+		mini=True,
+		on_click=lambda e: chat_list.scroll_to(offset=-1, duration=300),  # -1 scroll tout en bas
+	)
+
+	# Fonction déclenchée quand on défile
+	def list_scrolled(e: ft.OnScrollEvent = None):
+		# Si on est remonté de plus de 100 pixels depuis le bas
+		if e.pixels < (e.max_scroll_extent - 100):
+			if not scroll_btn.visible:
+				scroll_btn.visible = True
+				scroll_btn.update()
+		else:
+			if scroll_btn.visible:
+				scroll_btn.visible = False
+				scroll_btn.update()
 
 	chat_list = ft.ListView(expand=True, spacing=15, auto_scroll=True, padding=10)
+	# on_scroll=list_scrolled
 
 	# 3. On demande la liste fraîche au serveur
 	try:
+		# response = await api.get(f"/room/{current_room_id}/messages")
 		async with httpx.AsyncClient() as client:
 			response = await client.get(
 				f"http://{host}:{port}/room/{current_room_id}/messages", headers=headers
 			)
 
-			# Si le jeton est expiré ou invalide (401)
-			if response.status_code == 401:
-				await storage.remove("cif_token")  # On nettoie
-				print("Erreur lors de la récupération des messages !")
-				await page.push_route("/rooms")  # On redirige
-				return
-
-			messages_received = response.json()
+		# Si le jeton est expiré ou invalide (401)
+		if response.status_code == 401:
+			print("Erreur lors de la récupération des messages !")
+			await page.push_route("/rooms")  # On redirige
+			return
+		#
+		messages_received = response.json()
 
 	# VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
 	except httpx.RequestError as ex:
@@ -274,30 +333,22 @@ async def ChatView(page: ft.Page):
 		page.session.store.remove("current_room_name")
 		await page.push_route("/rooms")
 
-	async def cancel_reply(e):  # Rendu async pour pouvoir être awaité
+	async def cancel_reply(e):
 		nonlocal replying_to_message
 		replying_to_message = None
 		reply_banner.visible = False
 		reply_banner.content.controls[0].controls[1].value = ""
 		page.update()
 
-	async def prepare_reply(msg: Message):  # Rendu async
+	async def prepare_reply(msg: Message):
 		nonlocal replying_to_message
 		replying_to_message = msg
 		reply_banner.visible = True
 		reply_banner.content.controls[0].controls[1].value = f"{msg.pseudo}: {msg.content[:30]}..."
-		await new_message.focus()  # CORRECTION DU WARNING ICI
+		await new_message.focus()
 		page.update()
 
-	async def react_to_message(msg: Message, emoji: str):
-		pass
-		# if emoji in msg.reactions:
-		# 	msg.reactions[emoji] += 1
-		# else:
-		# 	msg.reactions[emoji] = 1
-		# await show_top_toast(page, "Réagi")
-
-	async def open_emoji_picker(e, message_id):
+	async def react_to_message(e, msg_id: int):
 		# Liste de tes emojis supportés
 		emojis = ["👍", "❤️", "😂", "😮", "😢", "😡"]
 
@@ -306,7 +357,7 @@ async def ChatView(page: ft.Page):
 			picker.open = False
 			# 2. Appeler ton API pour envoyer la réaction
 			# await react_to_message(message_id, emoji_char)
-			print(f"Réaction {emoji_char} envoyée pour le msg {message_id}")
+			print(f"Réaction {emoji_char} envoyée pour le msg {msg_id}")
 
 		# Construction de la grille d'emojis
 		emoji_row = ft.Row(
@@ -345,9 +396,6 @@ async def ChatView(page: ft.Page):
 						return
 
 					await show_top_toast(page, "Signalement envoyé à la modération.")
-					# snack_bar = ft.SnackBar(ft.Text("Signalement envoyé à la modération."))
-					# page.show_dialog(snack_bar)
-					# page.update()
 
 			# VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
 			except httpx.RequestError as ex:
@@ -418,7 +466,7 @@ async def ChatView(page: ft.Page):
 				await new_message.focus()
 				page.update()
 
-				# On envoie le pubsub
+				# On envoie le pubsub si le message est arrivé en bdd
 				page.pubsub.send_all(
 					Message(
 						id=1001,
@@ -442,7 +490,7 @@ async def ChatView(page: ft.Page):
 
 		new_message.value = ""
 		await cancel_reply(None)
-		await new_message.focus()  # CORRECTION DU WARNING ICI
+		await new_message.focus()
 		page.update()
 
 	def on_message(message: Message):
@@ -455,24 +503,70 @@ async def ChatView(page: ft.Page):
 					page=page,
 					on_reply=prepare_reply,
 					on_report=report_message,
-					on_react=open_emoji_picker,
+					on_react=react_to_message,
 				)
 			)
 		page.update()  # Reste synchrone car c'est un callback PubSub
 
-	# On affiche les messages
-	if messages_received:
-		for message_to_show in messages_received:
-			me = Message(
-				id=message_to_show["id"],
-				pseudo=message_to_show["author_display_name"],
-				content=message_to_show["content"],
-				message_type=message_to_show["message_type"],
-				parent_id=message_to_show["parent_id"],
-			)
-			on_message(me)
-	else:
-		pass
+	async def show_messages(messages_received):
+		last_date = None
+		# On affiche les messages
+		if messages_received:
+			if type(messages_received) == dict:
+				messages_received_list = [None]
+				messages_received_list[0] = messages_received
+				messages_received = messages_received_list
+
+			for message_to_show in messages_received:
+				# On cherche s'il y a parent et le message et l'author du parent
+				parent_id = message_to_show["parent_id"]
+				parent_content = None
+				parent_author = None
+
+				if parent_id:
+					for m in messages_received:
+						if not m["id"] == parent_id:
+							continue
+						parent_content = m["content"]
+						parent_author = m["author_display_name"]
+						break
+					if not parent_content:
+						parent_content = "Message supprimé !"
+						parent_content = "Autheur supprimé !"
+
+				message_datetime = datetime.strptime(
+					message_to_show["created_at"], "%Y-%m-%dT%H:%M:%S"
+				)
+				message_date = message_datetime.date()
+
+				me = Message(
+					id=message_to_show["id"],
+					pseudo=message_to_show["author_display_name"],
+					content=message_to_show["content"],
+					message_type=message_to_show["message_type"],
+					message_date=message_date,
+					message_time=message_datetime.time(),
+					parent_id=parent_id,
+					parent_content=parent_content,
+					parent_author=parent_author,
+				)
+
+				# Si le jour est différent du message précédent, on insère un badge de date
+				if message_date != last_date:
+					date_divider = ft.Container(
+						content=ft.Text(format_date(message_date), size=12, weight="bold"),
+						alignment=ft.Alignment.CENTER,
+						padding=ft.padding.symmetric(vertical=10),
+					)
+					chat_list.controls.append(date_divider)
+					last_date = message_date
+				# On affiche le message
+				on_message(me)
+			chat_list.scroll_to(offset=-1)
+		else:
+			return
+
+	await show_messages(messages_received)
 
 	page.pubsub.subscribe(on_message)
 
@@ -502,6 +596,7 @@ async def ChatView(page: ft.Page):
 				padding=0,
 				expand=True,
 			),
+			# ft.Stack(scroll_btn),
 			ft.Container(
 				content=ft.Column(
 					spacing=0,

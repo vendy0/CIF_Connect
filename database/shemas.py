@@ -157,9 +157,6 @@ class JoinRoomSchema(BaseModel):
 	access_key: Optional[str] = None
 
 
-# ... (à la suite des autres classes Room)
-
-
 class RoomUpdateSchema(BaseModel):
 	"""Payload pour modifier un salon (tous champs optionnels)"""
 
