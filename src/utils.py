@@ -32,21 +32,6 @@ async def decode_token(token):
 		payload_json = base64.b64decode(payload_b64 + "==").decode("utf-8")
 		user_info = json.loads(payload_json)
 		return user_info
-
-		# # Stockage des infos utiles via SharedPreferences
-		# if "pseudo" in user_info:
-		# 	await storage.set("user_pseudo", user_info["pseudo"])
-		# if "role" in user_info:
-		# 	await storage.set("user_role", user_info["role"])
-		# await storage.remove("cif_connect_app.pseudo")
-		# keys = await storage.get_keys("")
-		# print(keys)
-		# print()
-		# listu = await storage.get_keys("")
-		# for i in listu:
-		# 	i_value = await storage.get(i)
-		# 	print(f"{i} : {i_value}")
-
 	except Exception as e:
 		print(f"Erreur décodage token: {e}")
 
@@ -76,6 +61,37 @@ class Room:
 		self.page.session.store.set("current_room_id", self.id)
 		self.page.session.store.set("current_room_name", self.name)
 		asyncio.create_task(self.page.push_route(route="/chat"))
+
+
+async def show_top_toast(page: ft.Page, message: str, is_error: bool = False):
+	color = ft.Colors.RED_600 if is_error else ft.Colors.GREEN_600
+
+	# On crée la bulle de notification
+	toast = ft.Container(
+		content=ft.Text(message, color=ft.Colors.WHITE, weight="bold"),
+		bgcolor=color,
+		padding=ft.padding.symmetric(horizontal=20, vertical=10),
+		border_radius=30,
+		top=20,  # Affichage en haut
+		right=20,  # On l'aligne en haut à droite (ou retire 'right' et gère l'alignement pour centrer)
+		animate_position=ft.Animation(300, ft.AnimationCurve.EASE_OUT),
+		animate_opacity=ft.Animation(300, ft.AnimationCurve.EASE_IN_OUT),
+		# alignment=ft.Alignment.CENTER,
+	)
+
+	# Avec Flet 0.80.5, on ajoute simplement à l'overlay pour ce genre d'éléments flottants non-modaux
+	page.overlay.append(toast)
+	page.update()
+
+	# On attend 3 secondes et on le fait disparaître
+	import asyncio
+
+	await asyncio.sleep(3)
+	toast.opacity = 0
+	page.update()
+	await asyncio.sleep(0.3)  # Temps de l'animation
+	page.overlay.remove(toast)
+	page.update()
 
 
 def load_json_file(filename):

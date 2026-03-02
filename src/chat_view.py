@@ -2,7 +2,7 @@ import flet as ft
 from dataclasses import dataclass, field
 from typing import List, Optional
 import httpx
-from utils import get_initials, get_avatar_color, get_colors, host, port
+from utils import get_initials, get_avatar_color, get_colors, host, port, show_top_toast
 
 
 # =============================================================================
@@ -175,7 +175,7 @@ class ChatMessage(ft.Column):
 	async def action_react(self, e, emoji="❤️"):
 		self.bottom_sheet.open = False
 		self.page.update()
-		await self.on_react(self.message, emoji)
+		await self.on_react(e, self.message.id)
 
 
 # =============================================================================
@@ -260,6 +260,7 @@ async def ChatView(page: ft.Page):
 
 	new_message = ft.TextField(
 		hint_text="Écrivez un message...",
+		capitalization=ft.TextCapitalization.SENTENCES,
 		autofocus=False,
 		expand=True,
 		min_lines=1,
@@ -289,12 +290,35 @@ async def ChatView(page: ft.Page):
 		page.update()
 
 	async def react_to_message(msg: Message, emoji: str):
-		if emoji in msg.reactions:
-			msg.reactions[emoji] += 1
-		else:
-			msg.reactions[emoji] = 1
-		page.show_dialog(ft.SnackBar(f"Emoji : {emoji} réagi sur le message {msg.id}"))
-		# (La logique UI sera faite plus tard si tu veux l'afficher)
+		pass
+		# if emoji in msg.reactions:
+		# 	msg.reactions[emoji] += 1
+		# else:
+		# 	msg.reactions[emoji] = 1
+		# await show_top_toast(page, "Réagi")
+
+	async def open_emoji_picker(e, message_id):
+		# Liste de tes emojis supportés
+		emojis = ["👍", "❤️", "😂", "😮", "😢", "😡"]
+
+		def on_emoji_click(click_event, emoji_char):
+			# 1. Fermer le menu en priorité (Flet 0.80.5 style)
+			picker.open = False
+			# 2. Appeler ton API pour envoyer la réaction
+			# await react_to_message(message_id, emoji_char)
+			print(f"Réaction {emoji_char} envoyée pour le msg {message_id}")
+
+		# Construction de la grille d'emojis
+		emoji_row = ft.Row(
+			controls=[
+				ft.TextButton(em, on_click=lambda ce, em=em: on_emoji_click(ce, em))
+				for em in emojis
+			],
+			alignment=ft.MainAxisAlignment.SPACE_EVENLY,
+		)
+
+		picker = ft.BottomSheet(content=ft.Container(content=emoji_row, padding=20, height=100))
+		page.show_dialog(picker)
 
 	async def report_message(msg: Message):
 		report_reason_input = ft.TextField(label="Raison du signalement", multiline=True)
@@ -303,7 +327,7 @@ async def ChatView(page: ft.Page):
 			if not report_reason_input.value.strip():
 				report_reason_input.error = "Le champ ne doit pas être vide !"
 				return
-			
+
 			report_dialog.open = False
 
 			# 3. On demande la liste fraîche au serveur
@@ -320,9 +344,10 @@ async def ChatView(page: ft.Page):
 						report_reason_input.error = "Il y a eu urreur lors du signalement !"
 						return
 
-					snack_bar = ft.SnackBar(ft.Text("Signalement envoyé à la modération."))
-					page.show_dialog(snack_bar)
-					page.update()
+					await show_top_toast(page, "Signalement envoyé à la modération.")
+					# snack_bar = ft.SnackBar(ft.Text("Signalement envoyé à la modération."))
+					# page.show_dialog(snack_bar)
+					# page.update()
 
 			# VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
 			except httpx.RequestError as ex:
@@ -430,7 +455,7 @@ async def ChatView(page: ft.Page):
 					page=page,
 					on_reply=prepare_reply,
 					on_report=report_message,
-					on_react=react_to_message,
+					on_react=open_emoji_picker,
 				)
 			)
 		page.update()  # Reste synchrone car c'est un callback PubSub
