@@ -1,5 +1,5 @@
 import flet as ft
-from utils import generate_secure_code, host, port
+from utils import generate_secure_code, host, port, api, show_top_toast
 import httpx
 
 
@@ -96,10 +96,33 @@ async def CreateRoomView(page: ft.Page):
 
 		if not code:
 			code_input.error = "Champ obligatoire."
-		elif code not in [r.code for r in rooms]:
-			code_input.error = "Salon introuvable."
-		else:
+			page.update()
+		try:
+			response = await api.post("/user/rooms/join", data={"access_key": code})
+			if response.status_code == 404:
+				code_input.error = "Salon introuvable."
+				page.update()
+				return
+
+			room = response.json()
+			page.session.store.set("current_room_id", room["id"])
+			page.session.store.set("current_room_name", room["name"])
 			await page.push_route("/chat")
+
+		# VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
+		except httpx.RequestError as ex:
+			await show_top_toast(page, "Erreur réseau !", True)
+			return
+
+		except Exception as e:
+			# En cas de problème réseau par exemple
+			await show_top_toast(page, "Erreur de connexion !", True)
+			await page.push_route("/rooms")
+			return
+		# elif code not in [r.code for r in rooms]:
+		# 	code_input.error = "Salon introuvable."
+		# else:
+		# 	await page.push_route("/chat")
 
 		page.update()
 
@@ -158,15 +181,6 @@ async def CreateRoomView(page: ft.Page):
 				room_name_input.error = "Erreur inconnue"
 				room_description_input.error = "Erreur inconnue"
 				return
-			# 	new_room = Room(
-			# 		page,
-			# 		len(rooms),
-			# 		name,
-			# 		desc,
-			# 		icon=state["selected_icon"],
-			# 		code=generate_secure_code(),
-			# 	)
-			# 	rooms.append(new_room)
 
 		page.update()
 

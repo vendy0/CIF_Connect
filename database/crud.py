@@ -168,9 +168,9 @@ def create_room(db: Session, room_data: CreateRoomSchema, creator_id: int):
 		raise HTTPException(status_code=500, detail="Erreur création salon")
 
 
-def join_new_room(db: Session, join_data: JoinRoomSchema):
+def join_new_room(db: Session, join_data: JoinRoomSchema, user_id: int):
 	# 1. Vérif Room et Clé
-	stmt = select(Room).where(Room.id == join_data.room_id)
+	stmt = select(Room).where(Room.access_key == join_data.access_key)
 	room = db.execute(stmt).scalars().first()
 
 	if not room:
@@ -182,7 +182,7 @@ def join_new_room(db: Session, join_data: JoinRoomSchema):
 			raise HTTPException(status_code=403, detail="Clé d'accès incorrecte !")
 
 	# 2. Vérif User
-	user = db.query(User).filter(User.id == join_data.user_id).first()
+	user = db.query(User).filter(User.id == user_id).first()
 	if not user:
 		raise HTTPException(status_code=404, detail="Utilisateur introuvable")
 

@@ -164,9 +164,9 @@ def get_my_rooms(db: Session = Depends(get_db), current_user_id: int = Depends(g
 
 
 @app.post("/user/rooms/join", response_model=RoomSchema, tags=["Rooms"])
-def join_room(data: JoinRoomSchema, db: Session = Depends(get_db)):
+def join_room(data: JoinRoomSchema, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user)):
 	"""Rejoindre un salon existant"""
-	return db_inter.join_new_room(db, data)
+	return db_inter.join_new_room(db, data, current_user_id)
 
 
 @app.post("/user/rooms/{room_id}/quit", response_model=RoomSchema, tags=["Rooms"])

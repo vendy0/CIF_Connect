@@ -151,9 +151,7 @@ class CreateRoomSchema(BaseModel):
 
 
 class JoinRoomSchema(BaseModel):
-	user_id: int
-	room_id: int
-	access_key: Optional[str] = None
+	access_key: str
 
 
 class RoomUpdateSchema(BaseModel):
