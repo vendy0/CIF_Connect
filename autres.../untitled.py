@@ -7,6 +7,7 @@
 - Les loadings.
 - Mettre un publique / private quand on crée une room
 - Premiere lettre en majuscule
+# - Quand il y a une nouvelle verson
 """
 # - Changer les print pour utiliser des barres d'infos
 # - Délimiteur parent message dans le front

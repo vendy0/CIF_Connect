@@ -24,9 +24,9 @@ async def RoomsView(page: ft.Page):
 
 			# Si le jeton est expiré ou invalide (401)
 			if response.status_code == 401:
+				await page.push_route("/login")  # On redirige
 				await sp.remove("cif_token")  # On nettoie
 				print("Erreur lors de la récupération des rooms !")
-				await page.push_route("/login")  # On redirige
 				return
 
 			rooms = response.json()

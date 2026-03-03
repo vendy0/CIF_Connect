@@ -92,7 +92,7 @@ class ChatMessage(ft.Column):
 					controls=[
 						ft.ListTile(
 							leading=ft.Icon(ft.Icons.FAVORITE_BORDER),
-							title=ft.Text("Liker"),
+							title=ft.Text("Réagir"),
 							on_click=self.action_react,  # Ajout de l'emoji par défaut
 						),
 						ft.ListTile(
@@ -359,13 +359,15 @@ async def ChatView(page: ft.Page):
 	async def react_to_message(e, msg_id: int):
 		# Liste de tes emojis supportés
 		emojis = ["👍", "❤️", "😂", "😮", "😢", "😡"]
+		emoji_selected = None
 
 		async def on_emoji_click(click_event, emoji_char):
 			# 1. Fermer le menu en priorité (Flet 0.80.5 style)
-			picker.open = False
+			# picker.open = False
+			page.pop_dialog()
 			# 2. Appeler ton API pour envoyer la réaction
 			try:
-				response = await api.post(page, f"/message/{msg_id}/reaction")
+				response = await api.post(f"/message/{msg_id}/reaction", data={"emoji": emoji_char})
 				# Si le jeton est expiré ou invalide (401)
 				if response.status_code == 401:
 					await show_top_toast(page, "La session a expiré !", True)
@@ -379,7 +381,7 @@ async def ChatView(page: ft.Page):
 				return
 			except Exception as e:
 				# En cas de problème réseau par exemple
-				await show_top_toast(page, f"Erreur de connexion : {e}", True)
+				await show_top_toast("Erreur server !")
 				await page.push_route("/rooms")
 				return
 

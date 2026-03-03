@@ -534,7 +534,7 @@ def reagir(db: Session, message_id: int, reaction_data: ReactionCreateSchema, us
 		db.commit()
 		# On renvoie un objet vide ou simulé pour dire "supprimé" au front,
 		# ou on gère ça via un code HTTP spécifique. Ici on retourne l'objet supprimé.
-		return existing_reaction
+		# return existing_reaction
 
 	# Sinon création
 	reaction = Reaction(
