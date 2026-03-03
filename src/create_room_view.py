@@ -150,22 +150,17 @@ async def CreateRoomView(page: ft.Page):
 
 			# 3. On demande la liste fraîche au serveur
 			try:
-				async with httpx.AsyncClient() as client:
-					response = await client.post(
-						f"http://{host}:{port}/rooms",
-						json=payload,
-						headers=headers,
-					)
+				response = await api.post(f"/rooms", data=payload)
 
-					if response.status_code != 201:
-						room_name_input.error = response.json().get("detail", "Erreur inconnue")
-						page.update()
-						return
+				if response.status_code != 201:
+					room_name_input.error = response.json().get("detail", "Erreur inconnue")
+					page.update()
+					return
 
-					room = response.json()
-					page.session.store.set("current_room_id", room["id"])
-					page.session.store.set("current_room_name", room["name"])
-					await page.push_route("/chat")
+				room = response.json()
+				page.session.store.set("current_room_id", room["id"])
+				page.session.store.set("current_room_name", room["name"])
+				await page.push_route("/chat")
 
 			# VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
 			except httpx.RequestError as ex:
