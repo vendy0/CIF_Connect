@@ -115,22 +115,6 @@ class ChatMessage(ft.Column):
 
 		# 1. Indicateur de réponse (ajouté uniquement si parent_id existe)
 		if self.message.parent_content and self.message.parent_author:
-			# bubble_content.append(
-			# 	ft.Container(
-			# 		content=ft.Row(
-			# 			[
-			# 				ft.Icon(ft.Icons.REPLY_ALL_ROUNDED, size=14, color=ft.Colors.OUTLINE),
-			# 				ft.Text("Réponse", size=12, italic=True, color=ft.Colors.OUTLINE),
-			# 			],
-			# 			tight=True,
-			# 			spacing=4,
-			# 		),
-			# 		padding=ft.padding.only(left=8, bottom=2),
-			# 		border=ft.border.only(left=ft.border.BorderSide(2, ft.Colors.OUTLINE)),
-			# 		margin=ft.margin.only(bottom=4),
-			# 	)
-			# )
-
 			bubble_content.append(
 				ft.Container(
 					ft.Row(
@@ -154,9 +138,7 @@ class ChatMessage(ft.Column):
 						spacing=0,
 					),
 					bgcolor=ft.Colors.SURFACE,  # Couleur de fond différente
-					# border_left=ft.BorderSide(
-					# 	4, ft.Colors.PRIMARY
-					# ),  # Ligne de couleur sur le côté gauche
+					# Ligne de couleur sur le côté gauche
 					border=ft.border.only(left=ft.border.BorderSide(4, ft.Colors.OUTLINE)),
 					padding=ft.padding.all(5),
 					border_radius=ft.border_radius.all(4),
@@ -256,7 +238,7 @@ async def ChatView(page: ft.Page):
 
 	# On récupère tous les messages
 	# 2. On prépare l'enveloppe (le header)
-	# headers = {"Authorization": f"Bearer {token}"}
+
 	# Le bouton (caché par défaut)
 	scroll_btn = ft.FloatingActionButton(
 		icon=ft.Icons.ARROW_DOWNWARD,
@@ -363,7 +345,6 @@ async def ChatView(page: ft.Page):
 
 		async def on_emoji_click(click_event, emoji_char):
 			# 1. Fermer le menu en priorité (Flet 0.80.5 style)
-			# picker.open = False
 			page.pop_dialog()
 			# 2. Appeler ton API pour envoyer la réaction
 			try:
@@ -466,14 +447,12 @@ async def ChatView(page: ft.Page):
 			return
 
 		text = new_message.value
-		parent_id = replying_to_message.id if replying_to_message else None
 
+		parent_id = replying_to_message.id if replying_to_message else None
 		# 3. On demande la liste fraîche au serveur
 		try:
-			payload = {"content": new_message.value.strip()}
+			payload = {"content": new_message.value.strip(), "parent_id": parent_id}
 			response = await api.post(f"/room/{current_room_id}/messages", data=payload)
-			if parent_id:
-				payload["parent_id"] = parent_id
 
 			# Si le jeton est expiré ou invalide (401)
 			if response.status_code != 201:
