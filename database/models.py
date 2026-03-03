@@ -96,7 +96,7 @@ class Room(Base):
 	name = Column(String, nullable=False, unique=True)
 	description = Column(String, nullable=False)
 	icon = Column(String, default=Icons.CHAT_BUBBLE_ROUNDED)
-	access_key = Column(String, nullable=True)  # Null = Public
+	access_key = Column(String, nullable=True, unique=True)  # Null = Public
 
 	created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
 	created_at = Column(DateTime, server_default=func.current_timestamp(), nullable=False)

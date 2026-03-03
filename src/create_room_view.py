@@ -119,10 +119,6 @@ async def CreateRoomView(page: ft.Page):
 			await show_top_toast(page, "Erreur de connexion !", True)
 			await page.push_route("/rooms")
 			return
-		# elif code not in [r.code for r in rooms]:
-		# 	code_input.error = "Salon introuvable."
-		# else:
-		# 	await page.push_route("/chat")
 
 		page.update()
 
@@ -149,6 +145,7 @@ async def CreateRoomView(page: ft.Page):
 				"name": name,
 				"description": desc,
 				"icon": state["selected_icon"],
+				"access_key": generate_secure_code(),
 			}
 
 			# 3. On demande la liste fraîche au serveur
@@ -165,7 +162,10 @@ async def CreateRoomView(page: ft.Page):
 						page.update()
 						return
 
-					await page.push_route("/rooms")
+					room = response.json()
+					page.session.store.set("current_room_id", room["id"])
+					page.session.store.set("current_room_name", room["name"])
+					await page.push_route("/chat")
 
 			# VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
 			except httpx.RequestError as ex:

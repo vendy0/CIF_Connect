@@ -143,7 +143,17 @@ def create_room(db: Session, room_data: CreateRoomSchema, creator_id: int):
 	try:
 		# 1. Création de la room
 		# On exclut creator_id car on va le passer manuellement à la colonne created_by
-		data = room_data.model_dump(exclude={"creator_id"})
+		data = room_data.model_dump()
+
+		# 3. Logique Toggle (Ajout/Suppression)
+		existing_room = db.execute(
+			select(Room).where(Room.access_key == data["access_key"])
+		).scalar_one_or_none()
+
+		if existing_room:
+			db.rollback()
+			raise HTTPException(status_code=409, detail="Réessayez dans un instant !")
+			return
 
 		# On crée l'objet Room
 		new_room = Room(**data, created_by=creator_id)
@@ -162,6 +172,10 @@ def create_room(db: Session, room_data: CreateRoomSchema, creator_id: int):
 	except IntegrityError:
 		db.rollback()
 		raise HTTPException(status_code=409, detail="Ce nom de salon existe déjà !")
+
+	except HTTPException:
+		raise
+
 	except Exception as e:
 		db.rollback()
 		print(f"Erreur create_room: {e}")
@@ -175,11 +189,6 @@ def join_new_room(db: Session, join_data: JoinRoomSchema, user_id: int):
 
 	if not room:
 		raise HTTPException(status_code=404, detail="Salon introuvable")
-
-	# Si clé requise et clé fournie incorrecte
-	if room.access_key is not None:
-		if room.access_key and room.access_key != join_data.access_key:
-			raise HTTPException(status_code=403, detail="Clé d'accès incorrecte !")
 
 	# 2. Vérif User
 	user = db.query(User).filter(User.id == user_id).first()
