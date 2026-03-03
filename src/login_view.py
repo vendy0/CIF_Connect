@@ -1,6 +1,6 @@
 import flet as ft
 import httpx
-from utils import generer_pseudo, decode_token, host, port
+from utils import generer_pseudo, decode_token, host, port, api
 from math import pi
 
 
@@ -37,6 +37,8 @@ async def LoginView(page: ft.Page):
 	async def login_success(token_data):
 		# On stocke le jeton pour les prochaines fois
 		await storage.set("cif_token", token_data["access_token"])
+		
+		api.set_token(token_data["access_token"])
 
 		# On peut aussi stocker le pseudo pour l'affichage rapide
 		# page.session.store reste utile pour les données temporaires de session

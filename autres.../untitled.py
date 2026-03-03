@@ -7,9 +7,9 @@
 - Les loadings.
 - Mettre un publique / private quand on crée une room
 - Premiere lettre en majuscule
-- Délimiteur parent message dans le front
-# - Changer les print pour utiliser des barres d'infos
 """
+# - Changer les print pour utiliser des barres d'infos
+# - Délimiteur parent message dans le front
 # - Informer par snack bar ou qlq chose de plus stylé
 # - Page de connexion
 # - Le jwt à la place des id dans les requetes.

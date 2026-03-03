@@ -506,7 +506,7 @@ def create_message(
 # ==============================================================================
 # GESTION DES RÉACTIONS
 # ==============================================================================
-def reagir(db: Session, message_id: int, reaction_data: ReactionCreateSchema):
+def reagir(db: Session, message_id: int, reaction_data: ReactionCreateSchema, user_id):
 	"""
 	Ajoute ou supprime une réaction.
 	"""
@@ -524,7 +524,7 @@ def reagir(db: Session, message_id: int, reaction_data: ReactionCreateSchema):
 	# 3. Logique Toggle (Ajout/Suppression)
 	existing_reaction = db.execute(
 		select(Reaction).where(
-			Reaction.user_id == reaction_data.user_id,
+			Reaction.user_id == user_id,
 			Reaction.message_id == message_id,
 		)
 	).scalar_one_or_none()
@@ -538,7 +538,7 @@ def reagir(db: Session, message_id: int, reaction_data: ReactionCreateSchema):
 
 	# Sinon création
 	reaction = Reaction(
-		user_id=reaction_data.user_id,
+		user_id=user_id,
 		message_id=message_id,
 		emoji=reaction_data.emoji,
 	)

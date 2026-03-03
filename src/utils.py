@@ -126,6 +126,8 @@ def format_date(date_to_format: datetime):
 	day = date_to_format.strftime("%d")
 
 	day_diff = int(date.today().strftime("%d")) - int(day)
+	if day_diff == -1:
+		return "Demain"
 	if day_diff == 0:
 		return "Aujourd'hui"
 	elif day_diff == 1:

@@ -64,7 +64,6 @@ class PseudoUpdateRequest(BaseModel):
 
 
 class ReactionCreateSchema(BaseModel):
-	user_id: int
 	emoji: str
 
 

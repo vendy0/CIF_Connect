@@ -223,10 +223,10 @@ def delete_message(message_id: int, user_id: int, db: Session = Depends(get_db))
 
 @app.post("/message/{message_id}/reaction", response_model=ReactionSchema, tags=["Reactions"])
 def add_reaction(
-	message_id: int, reaction_data: ReactionCreateSchema, db: Session = Depends(get_db)
+	message_id: int, reaction_data: ReactionCreateSchema, user_id:int=Depends(get_current_user), db: Session = Depends(get_db)
 ):
 	"""Ajouter un emoji à un message"""
-	return db_inter.reagir(db, message_id, reaction_data)
+	return db_inter.reagir(db, message_id, reaction_data, user_id)
 
 
 @app.delete("/reaction/{reaction_id}", response_model=ReactionReturnSchema, tags=["Reactions"])

@@ -13,6 +13,7 @@ from utils import (
 	format_date,
 	api,
 )
+import asyncio
 
 
 # =============================================================================
@@ -167,6 +168,19 @@ class ChatMessage(ft.Column):
 			[
 				ft.Text(self.message.pseudo, weight="bold"),
 				ft.Text(self.message.content),
+				ft.Divider(),
+				ft.Row(
+					controls=[
+						ft.Text(
+							self.message.message_time.strftime("%H:%M"),  # Format 14:30
+							size=10,
+							color=ft.Colors.ON_SURFACE_VARIANT,
+							weight="bold",
+							text_align=ft.TextAlign.END,
+						),
+					],
+					alignment=ft.MainAxisAlignment.END,  # Aligné à droite			]
+				),
 			]
 		)
 
@@ -233,7 +247,7 @@ async def ChatView(page: ft.Page):
 	replying_to_message: Optional[Message] = None
 
 	if not current_room_id:
-		print("Le salon est introuvable !")
+		await show_top_toast(page, "Le salon est introuvable !", True)
 		await page.push_route("/rooms")
 		page.update()
 
@@ -242,7 +256,7 @@ async def ChatView(page: ft.Page):
 
 	# On récupère tous les messages
 	# 2. On prépare l'enveloppe (le header)
-	headers = {"Authorization": f"Bearer {token}"}
+	# headers = {"Authorization": f"Bearer {token}"}
 	# Le bouton (caché par défaut)
 	scroll_btn = ft.FloatingActionButton(
 		icon=ft.Icons.ARROW_DOWNWARD,
@@ -268,30 +282,24 @@ async def ChatView(page: ft.Page):
 
 	# 3. On demande la liste fraîche au serveur
 	try:
-		# response = await api.get(f"/room/{current_room_id}/messages")
-		async with httpx.AsyncClient() as client:
-			response = await client.get(
-				f"http://{host}:{port}/room/{current_room_id}/messages", headers=headers
-			)
+		response = await api.get(f"/room/{current_room_id}/messages")
 
 		# Si le jeton est expiré ou invalide (401)
 		if response.status_code == 401:
-			print("Erreur lors de la récupération des messages !")
-			await page.push_route("/rooms")  # On redirige
+			await show_top_toast(page, "La session a expiré !", True)
+			await page.push_route("/login")  # On redirige
 			return
 		#
 		messages_received = response.json()
 
 	# VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
 	except httpx.RequestError as ex:
-		print(f"Erreur réseau : {ex}")
-		room_name_input.error = "Serveur injoignable"
-		room_description_input.error = "Serveur injoignable"
-		page.update()
+		await show_top_toast(page, "Erreur réseau !", True)
 		return
+
 	except Exception as e:
 		# En cas de problème réseau par exemple
-		print(f"Erreur de connexion : {e}")
+		await show_top_toast(page, "Erreur de connexion !", True)
 		await page.push_route("/rooms")
 		return
 
@@ -352,17 +360,35 @@ async def ChatView(page: ft.Page):
 		# Liste de tes emojis supportés
 		emojis = ["👍", "❤️", "😂", "😮", "😢", "😡"]
 
-		def on_emoji_click(click_event, emoji_char):
+		async def on_emoji_click(click_event, emoji_char):
 			# 1. Fermer le menu en priorité (Flet 0.80.5 style)
 			picker.open = False
 			# 2. Appeler ton API pour envoyer la réaction
-			# await react_to_message(message_id, emoji_char)
-			print(f"Réaction {emoji_char} envoyée pour le msg {msg_id}")
+			try:
+				response = await api.post(page, f"/message/{msg_id}/reaction")
+				# Si le jeton est expiré ou invalide (401)
+				if response.status_code == 401:
+					await show_top_toast(page, "La session a expiré !", True)
+					await page.push_route("/login")  # On redirige
+					return
+
+			# VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
+			except httpx.RequestError as ex:
+				await show_top_toast(page, "Erreur réseau !", True)
+				await page.push_route("/rooms")
+				return
+			except Exception as e:
+				# En cas de problème réseau par exemple
+				await show_top_toast(page, f"Erreur de connexion : {e}", True)
+				await page.push_route("/rooms")
+				return
 
 		# Construction de la grille d'emojis
 		emoji_row = ft.Row(
 			controls=[
-				ft.TextButton(em, on_click=lambda ce, em=em: on_emoji_click(ce, em))
+				ft.TextButton(
+					em, on_click=lambda ce, em=em: ce.page.run_task(on_emoji_click, ce, em)
+				)
 				for em in emojis
 			],
 			alignment=ft.MainAxisAlignment.SPACE_EVENLY,
@@ -383,23 +409,20 @@ async def ChatView(page: ft.Page):
 
 			# 3. On demande la liste fraîche au serveur
 			try:
-				async with httpx.AsyncClient() as client:
-					payload = {"message_id": msg.id, "raison": report_reason_input.value.strip()}
-					response = await client.post(
-						f"http://{host}:{port}/reports", headers=headers, json=payload
-					)
+				payload = {"message_id": msg.id, "raison": report_reason_input.value.strip()}
+				response = await api.post(f"/reports", data=payload)
 
-					# Si le jeton est expiré ou invalide (401)
-					if response.status_code != 201:
-						print("Erreur lors du signalement !")
-						report_reason_input.error = "Il y a eu urreur lors du signalement !"
-						return
+				# Si le jeton est expiré ou invalide (401)
+				if response.status_code != 201:
+					await show_top_toast(page, "Erreur lors du signalement !", True)
+					report_reason_input.error = "Il y a eu urreur lors du signalement !"
+					return
 
-					await show_top_toast(page, "Signalement envoyé à la modération.")
+				await show_top_toast(page, "Signalement envoyé à la modération.")
 
 			# VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
 			except httpx.RequestError as ex:
-				print(f"Erreur réseau : {ex}")
+				await show_top_toast(page, "Erreur réseau !", True)
 				report_reason_input.error = "Serveur injoignable"
 				page.update()
 				return
@@ -407,7 +430,7 @@ async def ChatView(page: ft.Page):
 				# En cas de problème réseau par exemple
 				report_reason_input.error = "Erreur de connexion !"
 				page.update()
-				print(f"Erreur de connexion : {e}")
+				await show_top_toast(page, "Erreur de connexion !", True)
 				return
 
 		def cancel_report(e):
@@ -445,46 +468,43 @@ async def ChatView(page: ft.Page):
 
 		# 3. On demande la liste fraîche au serveur
 		try:
-			async with httpx.AsyncClient() as client:
-				payload = {"content": new_message.value.strip()}
-				if parent_id:
-					payload["parent_id"] = parent_id
-				response = await client.post(
-					f"http://{host}:{port}/room/{current_room_id}/messages",
-					headers=headers,
-					json=payload,
-				)
+			payload = {"content": new_message.value.strip()}
+			response = await api.post(f"/room/{current_room_id}/messages", data=payload)
+			if parent_id:
+				payload["parent_id"] = parent_id
 
-				# Si le jeton est expiré ou invalide (401)
-				if response.status_code != 201:
-					print("Erreur lors de l'envoi du message !")
-					new_message.error = "Message non envoyé !"
-					page.update()
-					return
-
-				new_message.value = ""
-				await new_message.focus()
+			# Si le jeton est expiré ou invalide (401)
+			if response.status_code != 201:
+				await show_top_toast(page, "Erreur lors de l'envoi du message !", True)
+				new_message.error = "Message non envoyé !"
 				page.update()
+				return
 
-				# On envoie le pubsub si le message est arrivé en bdd
-				page.pubsub.send_all(
-					Message(
-						id=1001,
-						pseudo=current_pseudo,
-						content=text,
-						message_type="chat",
-						parent_id=parent_id,
-					)
+			new_message.value = ""
+			await new_message.focus()
+			page.update()
+
+			# On envoie le pubsub si le message est arrivé en bdd
+			page.pubsub.send_all(
+				Message(
+					id=1001,
+					pseudo=current_pseudo,
+					content=text,
+					message_type="chat",
+					parent_id=parent_id,
+					message_date=datetime.now().date(),
+					message_time=datetime.now().time(),
 				)
+			)
 		# VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
 		except httpx.RequestError as ex:
-			print(f"Erreur lors de l'envoi du message : {ex}")
+			await show_top_toast(page, "Erreur lors de l'envoi du message !", True)
 			new_message.error = "Erreur, Message non envoyé !"
 			page.update()
 			return
 		except Exception as e:
 			# En cas de problème réseau par exemple
-			print(f"Erreur de connexion : {e}")
+			await show_top_toast(page, "Erreur de connexion !", True)
 			new_message.error = "Erreur connexion !"
 			return
 
@@ -562,7 +582,8 @@ async def ChatView(page: ft.Page):
 					last_date = message_date
 				# On affiche le message
 				on_message(me)
-			chat_list.scroll_to(offset=-1)
+			# await asyncio.sleep(0.1)
+			# chat_list.scroll_to(offset=-1)
 		else:
 			return
 

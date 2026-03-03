@@ -4,7 +4,7 @@ from chat_view import ChatView
 from settings_view import SettingsView
 from rooms_view import RoomsView
 from create_room_view import CreateRoomView
-from utils import generer_pseudo, view_pop, decode_token
+from utils import generer_pseudo, view_pop, decode_token, api
 # import asyncio
 	
 print(" =============== LANCEMENT DE FLET =============== ")
@@ -43,6 +43,8 @@ async def main(page: ft.Page):
 	if await storage.contains_key("cif_token"):
 		# On récupère le token
 		token = await storage.get("cif_token")
+		
+		api.set_token(token)
 
 		# Décodage
 		user_info = await decode_token(token)
@@ -54,6 +56,8 @@ async def main(page: ft.Page):
 			await storage.set("user_role", user_info["role"])
 		if "email" in user_info:
 			await storage.set("user_email", user_info["email"])
+		
+		
 		await page.push_route("/rooms")
 	else:
 		await page.push_route("/login")
