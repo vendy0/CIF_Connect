@@ -97,6 +97,7 @@ class MessageSchema(BaseModel):
 	content: str
 	message_type: str
 	created_at: datetime
+	modified: bool
 	room_id: int
 	parent_id: Optional[int] = None  # ID du message parent si réponse
 
@@ -105,6 +106,10 @@ class MessageSchema(BaseModel):
 
 	class ConfigDict:
 		from_attributes = True
+
+
+class EditMessageSchema(BaseModel):
+	content: str
 
 
 class ReactionReturnSchema(BaseModel):

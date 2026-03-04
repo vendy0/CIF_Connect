@@ -85,6 +85,9 @@ class APIClient:
 
 	async def post(self, endpoint: str, data: dict):
 		return await self.client.post(endpoint, json=data)
+		
+	async def put(self, endpoint: str, data: dict):
+		return await self.client.put(endpoint, json=data)
 
 
 # On instancie un client unique qui sera importé partout

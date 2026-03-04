@@ -18,10 +18,6 @@ def verify_user_room(db: Session, user_id: int, room_id: int):
 	return True
 
 
-# def get_password_hash(password: str):
-#     return pwd_context.hash(password)
-
-
 # ==============================================================================
 # GESTION DES UTILISATEURS
 # ==============================================================================
@@ -411,44 +407,6 @@ def update_report_status(db: Session, report_id: int, new_status: str):
 		raise HTTPException(status_code=500, detail="Erreur mise à jour signalement")
 
 
-def delete_message_func(db: Session, message_id: int, user_id: int):
-	"""
-	Supprime un message.
-	"""
-	# 1. Récupérer le message
-	stmt = select(Message).where(Message.id == message_id)
-	message = db.execute(stmt).scalar_one_or_none()
-
-	if not message:
-		raise HTTPException(status_code=404, detail="Message introuvable")
-
-	# 2. Protection des messages système
-	if message.message_type in ["join", "quit"]:
-		raise HTTPException(status_code=403, detail="Impossible de supprimer un message système.")
-
-	# 3. Vérification des droits (Auteur ou Admin)
-	user_stmt = select(User).where(User.id == user_id)
-	user = db.execute(user_stmt).scalar_one_or_none()
-
-	is_admin = (user.role == "admin") if user else False
-	is_author = message.author_id == user_id
-
-	if not (is_author or is_admin):
-		raise HTTPException(
-			status_code=403, detail="Vous n'avez pas le droit de supprimer ce message."
-		)
-
-	# 4. Suppression
-	try:
-		db.delete(message)
-		db.commit()
-		return {"detail": "Message supprimé", "message_id": message_id}
-	except Exception as e:
-		db.rollback()
-		print(f"Erreur delete_message: {e}")
-		raise HTTPException(status_code=500, detail="Impossible de supprimer le message")
-
-
 # ==============================================================================
 # GESTION DES MESSAGES
 # ==============================================================================
@@ -510,6 +468,89 @@ def create_message(
 		db.rollback()
 		print(f"Erreur create_message: {e}")
 		raise HTTPException(status_code=400, detail="Erreur lors de l'envoi")
+
+
+def edit_message_func(db: Session, message_id: int, data: EditMessageSchema, user_id: int):
+	"""
+	Modifier un message.
+	"""
+	# 1. Récupérer le message
+	stmt = select(Message).where(Message.id == message_id)
+	message = db.execute(stmt).scalar_one_or_none()
+
+	if not message:
+		raise HTTPException(status_code=404, detail="Message introuvable")
+
+	if (datetime.now() - timedelta(minutes=15)) > message.created_at:
+		raise HTTPException(
+			status_code=401, detail="Impossible de modifier un message après 15 minutes."
+		)
+
+	# 2. Protection des messages système
+	if message.message_type in ["join", "quit"]:
+		raise HTTPException(status_code=403, detail="Impossible de modifier un message système.")
+
+	# 3. Vérification des droits (Auteur)
+	user_stmt = select(User).where(User.id == user_id)
+	user = db.execute(user_stmt).scalar_one_or_none()
+
+	is_author = message.author_id == user_id
+
+	if not is_author:
+		raise HTTPException(
+			status_code=403, detail="Vous n'avez pas le droit de supprimer ce message."
+		)
+
+	# 4. Suppression
+	try:
+		message.content = data.content
+		message.modified = True
+
+		db.commit()
+		db.refresh(message)
+		return message
+	except Exception as e:
+		db.rollback()
+		print(f"Erreur edit_message: {e}")
+		raise HTTPException(status_code=500, detail="Impossible de modifier le message")
+
+
+def delete_message_func(db: Session, message_id: int, user_id: int):
+	"""
+	Supprime un message.
+	"""
+	# 1. Récupérer le message
+	stmt = select(Message).where(Message.id == message_id)
+	message = db.execute(stmt).scalar_one_or_none()
+
+	if not message:
+		raise HTTPException(status_code=404, detail="Message introuvable")
+
+	# 2. Protection des messages système
+	if message.message_type in ["join", "quit"]:
+		raise HTTPException(status_code=403, detail="Impossible de supprimer un message système.")
+
+	# 3. Vérification des droits (Auteur ou Admin)
+	user_stmt = select(User).where(User.id == user_id)
+	user = db.execute(user_stmt).scalar_one_or_none()
+
+	is_admin = (user.role == "admin") if user else False
+	is_author = message.author_id == user_id
+
+	if not (is_author or is_admin):
+		raise HTTPException(
+			status_code=403, detail="Vous n'avez pas le droit de supprimer ce message."
+		)
+
+	# 4. Suppression
+	try:
+		db.delete(message)
+		db.commit()
+		return {"detail": "Message supprimé", "message_id": message_id}
+	except Exception as e:
+		db.rollback()
+		print(f"Erreur delete_message: {e}")
+		raise HTTPException(status_code=500, detail="Impossible de supprimer le message")
 
 
 # ==============================================================================

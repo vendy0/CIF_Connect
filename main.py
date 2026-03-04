@@ -164,7 +164,11 @@ def get_my_rooms(db: Session = Depends(get_db), current_user_id: int = Depends(g
 
 
 @app.post("/user/rooms/join", response_model=RoomSchema, tags=["Rooms"])
-def join_room(data: JoinRoomSchema, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user)):
+def join_room(
+	data: JoinRoomSchema,
+	db: Session = Depends(get_db),
+	current_user_id: int = Depends(get_current_user),
+):
 	"""Rejoindre un salon existant"""
 	return db_inter.join_new_room(db, data, current_user_id)
 
@@ -204,7 +208,18 @@ def send_message(
 	return db_inter.create_message(db, room_id, message_data, current_user_id)
 
 
-# MODÉRATION DES MESSAGES
+@app.put("/message/{message_id}", tags=["Messages"])
+def edit_message(
+	message_id: int,
+	data: EditMessageSchema,
+	user_id: int = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	"""
+	Modifier un message.
+	Possible si on est l'auteur.
+	"""
+	return db_inter.edit_message_func(db, message_id, data, user_id)
 
 
 @app.delete("/message/{message_id}", tags=["Messages"])
@@ -223,7 +238,10 @@ def delete_message(message_id: int, user_id: int, db: Session = Depends(get_db))
 
 @app.post("/message/{message_id}/reaction", response_model=ReactionSchema, tags=["Reactions"])
 def add_reaction(
-	message_id: int, reaction_data: ReactionCreateSchema, user_id:int=Depends(get_current_user), db: Session = Depends(get_db)
+	message_id: int,
+	reaction_data: ReactionCreateSchema,
+	user_id: int = Depends(get_current_user),
+	db: Session = Depends(get_db),
 ):
 	"""Ajouter un emoji à un message"""
 	return db_inter.reagir(db, message_id, reaction_data, user_id)
