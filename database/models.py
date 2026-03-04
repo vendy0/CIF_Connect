@@ -63,7 +63,7 @@ class User(Base):
     email = Column(String, nullable=False, unique=True, index=True)
     password = Column(String, nullable=False)
     pseudo = Column(String, nullable=False, unique=True, index=True)
-    last_pseudo_update = Column(DateTime, default=datetime.now(), nullable=False)
+    last_pseudo_update = Column(DateTime, default=datetime.now().replace(microsecond=0), nullable=False)
     role = Column(String, default="eleve", nullable=False)
 
     # Gestion Ban
@@ -71,7 +71,7 @@ class User(Base):
     ban_expires_at = Column(DateTime, nullable=True)
     ban_reason = Column(String, nullable=True)
 
-    created_at = Column(DateTime, default=datetime.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.now().replace(microsecond=0), nullable=False)
 
     # --- Relations ---
     created_rooms = relationship("Room", back_populates="creator")
@@ -94,7 +94,7 @@ class Room(Base):
     access_key = Column(String, nullable=True, unique=True)  # Null = Public
 
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
-    created_at = Column(DateTime, default=datetime.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.now().replace(microsecond=0), nullable=False)
 
     # --- Relations ---
     creator = relationship("User", back_populates="created_rooms")
@@ -109,7 +109,7 @@ class Message(Base):
     author_display_name = Column(String)  # Pseudo figé au moment de l'envoi
     content = Column(String, nullable=False)
     message_type = Column(String, default="chat")  # 'join', 'alert', etc.
-    created_at = Column(DateTime, default=datetime.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.now().replace(microsecond=0), nullable=False)
 
     room_id = Column(Integer, ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False)
     author_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -136,7 +136,7 @@ class Reaction(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     message_id = Column(Integer, ForeignKey("messages.id", ondelete="CASCADE"), nullable=False)
     emoji = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.now().replace(microsecond=0), nullable=False)
 
     # --- Relations ---
     user = relationship("User", back_populates="reactions")
@@ -154,7 +154,7 @@ class Report(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     raison = Column(String)
     status = Column(String, default="pending", nullable=False)  # pending, resolved, dismissed
-    created_at = Column(DateTime, default=datetime.now(), nullable=False)
+    created_at = Column(DateTime, default=datetime.now().replace(microsecond=0), nullable=False)
 
     reporter_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     reported_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
