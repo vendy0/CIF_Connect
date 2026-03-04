@@ -12,6 +12,7 @@
 # - Mot de passe oublié
 # - Reprendre une Room la où l'on s'est arrêté
 # - Rechercher un message
+# - Taguer
 """
 # - Changer les print pour utiliser des barres d'infos
 # - Délimiteur parent message dans le front

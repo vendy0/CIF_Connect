@@ -28,6 +28,7 @@ class Message:
 	content: str
 	message_type: str
 	modified: bool
+	message_datetime: datetime
 	message_date: date
 	message_time: time
 	parent_id: Optional[int] = None
@@ -73,6 +74,8 @@ class SystemMessage(ft.Row):
 		]
 
 
+
+
 class ChatMessage(ft.Row):  # On repasse en Row pour mettre l'Avatar à gauche
 	def __init__(
 		self,
@@ -112,6 +115,7 @@ class ChatMessage(ft.Row):  # On repasse en Row pour mettre l'Avatar à gauche
 							on_click=self.action_edit,
 						)
 						if self.message.pseudo == self.current_pseudo
+						and (datetime.now() - timedelta(minutes=15)) < message.message_datetime
 						else ft.Container(),
 						ft.ListTile(
 							leading=ft.Icon(ft.Icons.FAVORITE_BORDER),
@@ -275,6 +279,12 @@ class ChatMessage(ft.Row):  # On repasse en Row pour mettre l'Avatar à gauche
 		self._page_ref.pop_dialog()
 		await self.on_report(self.message)
 
+class MyMessage(ChatMessage):
+	pass
+
+
+class OthersMessage(ChatMessage):
+	pass
 
 # =============================================================================
 # 3. VUE PRINCIPALE DU CHAT
@@ -435,7 +445,9 @@ async def ChatView(page: ft.Page):
 		async def fermer_dialogue(e):
 			page.pop_dialog()
 
-		edit_message_input = ft.TextField(value=msg.content, label="Message", multiline=True, autofocus=True)
+		edit_message_input = ft.TextField(
+			value=msg.content, label="Message", multiline=True, autofocus=True
+		)
 		dlg = ft.AlertDialog(
 			title=ft.Text("Modifier le message"),
 			modal=True,
@@ -591,6 +603,7 @@ async def ChatView(page: ft.Page):
 					message_type=message["message_type"],
 					modified=message["modified"],
 					parent_id=message["parent_id"],
+					message_datetime=message_datetime,
 					message_date=message_date,
 					message_time=message_time,
 				)
@@ -674,6 +687,7 @@ async def ChatView(page: ft.Page):
 					pseudo=message_to_show["author_display_name"],
 					content=message_to_show["content"],
 					message_type=message_to_show["message_type"],
+					message_datetime=message_datetime,
 					message_date=message_date,
 					message_time=message_datetime.time(),
 					parent_id=parent_id,
