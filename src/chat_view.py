@@ -389,7 +389,7 @@ class ChatMessage(ft.Row):  # On repasse en Row pour mettre l'Avatar à gauche
                     content=ft.Column(
                         [
                             ft.Text(self.message.parent_author, size=11, weight="bold", color=ft.Colors.PRIMARY),
-                            ft.Text(self.message.parent_content, size=12, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, italic=True),
+                            ft.Text(self.message.parent_content, size=12, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, italic=True, selectable=True),
                         ],
                         spacing=1,
                     ),
@@ -406,24 +406,38 @@ class ChatMessage(ft.Row):  # On repasse en Row pour mettre l'Avatar à gauche
         bubble_content.extend(
             [
                 ft.Text(self.message.pseudo, size=12, weight="bold", color=get_avatar_color(self.message.pseudo, COLORS_LOOKUP)),
-                ft.Text(self.message.content, size=15),
+                ft.Text(self.message.content, size=15, selectable=True),
             ]
         )
 
         # 3. La barre de réactions intégrée (Fini le Stack qui déborde)
-        if self.message.reactions:
-            reactions_row = ft.Row(wrap=True, spacing=4)
-            for emoji_char, count in self.message.reactions.items():
-                badge = ft.Container(
-                    content=ft.Row([ft.Text(emoji_char, size=12), ft.Text(str(count), size=12, color=ft.Colors.ON_SURFACE_VARIANT, weight="bold")], spacing=3, tight=True),
-                    padding=ft.padding.symmetric(horizontal=6, vertical=2),
-                    bgcolor=ft.Colors.SURFACE_CONTAINER_HIGH,
-                    border_radius=15,
-                    border=ft.border.all(1, ft.Colors.OUTLINE_VARIANT),
-                )
-                reactions_row.controls.append(badge)
+        # if self.message.reactions:
+        #     reactions_row = ft.Row(wrap=True, spacing=4)
+        #     for emoji_char, count in self.message.reactions.items():
+        #         badge = ft.Container(
+        #             content=ft.Row([ft.Text(emoji_char, size=12), ft.Text(str(count), size=12, color=ft.Colors.ON_SURFACE_VARIANT, weight="bold")], spacing=3, tight=True),
+        #             padding=ft.padding.symmetric(horizontal=6, vertical=2),
+        #             bgcolor=ft.Colors.SURFACE_CONTAINER_HIGH,
+        #             border_radius=15,
+        #             border=ft.border.all(1, ft.Colors.OUTLINE_VARIANT),
+        #         )
+        #         reactions_row.controls.append(badge)
 
-            bubble_content.append(reactions_row)
+        #     bubble_content.append(reactions_row)
+
+        # 1. Prépare tes réactions à part (ne les ajoute PAS à bubble_items)
+        reactions_row = ft.Row(spacing=4, tight=True)
+        if self.message.reactions:
+            for emoji, count in self.message.reactions.items():
+                reactions_row.controls.append(
+                    ft.Container(
+                        content=ft.Text(f"{emoji} {count}", size=11),
+                        bgcolor=ft.Colors.SURFACE_CONTAINER_HIGH,
+                        border_radius=10,
+                        padding=ft.padding.symmetric(horizontal=6, vertical=2),
+                        border=ft.border.all(1, ft.Colors.OUTLINE_VARIANT),
+                    )
+                )
 
         # 4. Heure (Conservée selon ton code)
         bubble_content.extend(
@@ -452,7 +466,7 @@ class ChatMessage(ft.Row):  # On repasse en Row pour mettre l'Avatar à gauche
                 bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
                 padding=10,
                 border_radius=10,
-                width=260,  # Largeur fixée pour un rendu propre type mobile
+                width=200,  # Largeur fixée pour un rendu propre type mobile
             ),
         )
 
@@ -461,7 +475,26 @@ class ChatMessage(ft.Row):  # On repasse en Row pour mettre l'Avatar à gauche
                 content=ft.Text(get_initials(self.message.pseudo)),
                 bgcolor=get_avatar_color(self.message.pseudo, COLORS_LOOKUP),
             ),
-            main_bubble,
+            ft.Stack(
+                [
+                    ft.Column(
+                        [
+                            main_bubble,
+                            ft.Container(height=10) if self.message.reactions else ft.Container(),  # Espace pour pas que ça chevauche le msg suivant
+                        ],
+                        tight=True,
+                    ),
+                    # Le badge flottant
+                    ft.Container(
+                        content=reactions_row,
+                        bottom=0,  # Aligné sur le bas
+                        right=10,  # Un peu décalé du bord droit
+                        # offset=ft.Offset(0, -0.5),  # DÉPLACE le container de moitié vers le bas (flottant)
+                    )
+                    if self.message.reactions
+                    else ft.Container(),
+                ]
+            ),
         ]
 
     # --- Méthodes d'action 0.80.5 ---
