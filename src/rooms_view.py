@@ -72,7 +72,8 @@ async def RoomsView(page: ft.Page):
 	return ft.View(
 		route="/rooms",
 		appbar=ft.AppBar(
-			title=ft.Text("Mes Salons"),
+			title=ft.Text("CIF Connect"),
+			center_title=True,
 			automatically_imply_leading=False,
 			actions=[
 				ft.IconButton(ft.Icons.SETTINGS, on_click=go_to_settings),
