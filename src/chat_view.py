@@ -130,11 +130,11 @@ class SystemMessage(ft.Row):
 #         )
 
 #         # --- Construction du contenu de la bulle ---
-#         bubble_content = []
+#         parent_bubble = []
 
 #         # 1. Message Parent (Reply) - Full Width (Style WhatsApp)
 #         if self.message.parent_content and self.message.parent_author:
-#             bubble_content.append(
+#             parent_bubble.append(
 #                 ft.Container(
 #                     content=ft.Column(
 #                         [
@@ -165,7 +165,7 @@ class SystemMessage(ft.Row):
 #             )
 
 #         # 2. Pseudo et Contenu
-#         bubble_content.extend(
+#         parent_bubble.extend(
 #             [
 #                 ft.Text(
 #                     self.message.pseudo,
@@ -192,7 +192,7 @@ class SystemMessage(ft.Row):
 #                 )
 
 #         # 4. Heure (Conservée selon ton code)
-#         bubble_content.extend(
+#         parent_bubble.extend(
 #             [
 #                 ft.Divider(height=5, color=ft.Colors.TRANSPARENT),
 #                 ft.Row(
@@ -215,7 +215,7 @@ class SystemMessage(ft.Row):
 #             content=ft.Container(
 #                 # L'ASTUCE ICI : CrossAxisAlignment.STRETCH force le message parent à prendre toute la largeur !
 #                 content=ft.Column(
-#                     bubble_content,
+#                     parent_bubble,
 #                     spacing=2,
 #                     tight=True,
 #                     horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
@@ -284,7 +284,7 @@ class BaseChatMessage(ft.Row):
         on_edit,
         on_report,
         on_react,
-        on_delete=None,
+        on_delete,
     ):
         super().__init__()
         self.message = message
@@ -295,11 +295,11 @@ class BaseChatMessage(ft.Row):
         self.on_report = on_report
         self.on_delete = on_delete
         self.vertical_alignment = ft.CrossAxisAlignment.START
-        self.bubble_content = ft.Container()
+        self.parent_bubble = ft.Container()
 
         # 1. Message Parent (Reply) - Full Width (Style WhatsApp)
         if self.message.parent_content and self.message.parent_author:
-            self.bubble_content = ft.Container(
+            self.parent_bubble = ft.Container(
                 content=ft.Column(
                     [
                         ft.Text(
@@ -373,7 +373,7 @@ class MyChatMessage(BaseChatMessage):
             ft.ListTile(
                 leading=ft.Icon(ft.Icons.DELETE_OUTLINE, color="error"),
                 title=ft.Text("Supprimer"),
-                on_click=lambda e: self._page_ref.run_task(on_delete, e, self.message),
+                on_click=lambda e: self._page_ref.run_task(self.on_delete, e, self.message),
             ),
             ft.ListTile(
                 leading=ft.Icon(ft.Icons.REPLY),
@@ -387,7 +387,7 @@ class MyChatMessage(BaseChatMessage):
             content=ft.Container(
                 content=ft.Column(
                     [
-                        self.bubble_content,
+                        self.parent_bubble,
                         ft.Text(
                             self.message.pseudo,
                             size=12,
@@ -492,14 +492,14 @@ class OtherChatMessage(BaseChatMessage):
             content=ft.Container(
                 content=ft.Column(
                     [
-                        self.bubble_content,
+                        self.parent_bubble,
                         ft.Text(
                             self.message.pseudo,
                             size=12,
                             weight="bold",
                             color=get_avatar_color(self.message.pseudo, COLORS_LOOKUP),
                         ),
-                        ft.Text(self.message.content, size=15, selectable=True),
+                        ft.Text(self.message.content, size=15),
                         ft.Row(
                             [ft.Text("Modifié •", size=9, italic=True) if self.message.modified else ft.Container(), ft.Text(self.message.message_time.strftime("%H:%M"), size=10)],
                             alignment="end",
@@ -594,6 +594,8 @@ async def ChatView(page: ft.Page):
         await show_top_toast(page, "Erreur de connexion !", True)
         await page.push_route("/rooms")
         return
+    finally:
+        pass
 
     reply_banner = ft.Container(
         visible=False,
@@ -665,7 +667,7 @@ async def ChatView(page: ft.Page):
                     return
 
                 page.update()
-                print(f"Message modifié : {msg.content}")
+                # print(f"Message modifié : {msg.content}")
             # VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
             except httpx.RequestError as ex:
                 await show_top_toast(page, "Erreur réseau !", True)
@@ -674,9 +676,11 @@ async def ChatView(page: ft.Page):
             except Exception as e:
                 # En cas de problème réseau par exemple
                 await show_top_toast(page, "Erreur server !", True)
-                print(e)
+                # print(e)
                 await page.push_route("/rooms")
                 return
+            finally:
+                pass
 
         async def fermer_dialogue(e):
             page.pop_dialog()
@@ -722,6 +726,8 @@ async def ChatView(page: ft.Page):
                 await show_top_toast("Erreur server !")
                 await page.push_route("/rooms")
                 return
+            finally:
+                pass
 
         # Construction de la grille d'emojis
         emoji_row = ft.Row(
@@ -767,6 +773,8 @@ async def ChatView(page: ft.Page):
                 page.update()
                 await show_top_toast(page, "Erreur de connexion !", True)
                 return
+            finally:
+                pass
 
         def cancel_report(e):
             report_dialog.open = False
@@ -794,6 +802,28 @@ async def ChatView(page: ft.Page):
         )
         page.show_dialog(report_dialog)
 
+    async def delete_message(e, msg: Message):
+        try:
+            response = await api.delete(endpoint=f"/message/{msg.id}")
+
+            if response.status_code != 204:
+                await show_top_toast(page, response.json().get("detail", "Erreur lors de la suppression !"), True)
+                return
+
+            await show_top_toast(page, "Message supprimé !")
+
+        except httpx.RequestError as ex:
+            await show_top_toast(page, "Erreur lors de la suppression !", True)
+            page.update()
+            return
+        except Exception as e:
+            # En cas de problème réseau par exemple
+            await show_top_toast(page, "Erreur de connexion !", True)
+            print(f"Erreur connexion {e}")
+            return
+        finally:
+            pass
+
     async def send_click(e):
         if not new_message.value:
             return
@@ -814,6 +844,7 @@ async def ChatView(page: ft.Page):
                 return
 
             message = response.json()
+            print(message)
 
             new_message.value = ""
             await new_message.focus()
@@ -861,25 +892,11 @@ async def ChatView(page: ft.Page):
         elif message.message_type == "chat":
             if message.pseudo != current_pseudo:
                 chat_list.controls.append(
-                    OtherChatMessage(
-                        message=message,
-                        page=page,
-                        on_reply=prepare_reply,
-                        on_edit=edit_message,
-                        on_report=report_message,
-                        on_react=react_to_message,
-                    )
+                    OtherChatMessage(message=message, page=page, on_reply=prepare_reply, on_edit=edit_message, on_report=report_message, on_react=react_to_message, on_delete=delete_message)
                 )
             else:
                 chat_list.controls.append(
-                    MyChatMessage(
-                        message=message,
-                        page=page,
-                        on_reply=prepare_reply,
-                        on_edit=edit_message,
-                        on_report=report_message,
-                        on_react=react_to_message,
-                    )
+                    MyChatMessage(message=message, page=page, on_reply=prepare_reply, on_edit=edit_message, on_report=report_message, on_react=react_to_message, on_delete=delete_message)
                 )
         page.update()  # Reste synchrone car c'est un callback PubSub
 

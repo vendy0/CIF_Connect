@@ -525,7 +525,10 @@ def delete_message_func(db: Session, message_id: int, user_id: int):
 
 	if not message:
 		raise HTTPException(status_code=404, detail="Message introuvable")
-
+	
+	if (datetime.now() - timedelta(days = 3)) > message.created_at:
+	    raise HTTPException(status_code=403, detail="Impossible de supprimer un message envoyé depuis plus de 3 jours.")
+    
 	# 2. Protection des messages système
 	if message.message_type in ["join", "quit"]:
 		raise HTTPException(status_code=403, detail="Impossible de supprimer un message système.")
