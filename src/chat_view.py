@@ -356,6 +356,9 @@ class BaseChatMessage(ft.Row):
 		self._page_ref.update()
 		self.on_react(e, self.message)
 
+	async def pass_func(self, e):
+		pass
+
 
 class MyChatMessage(BaseChatMessage):
 	def __init__(self, **kwargs):
@@ -389,7 +392,7 @@ class MyChatMessage(BaseChatMessage):
 		]
 
 		bubble = ft.GestureDetector(
-			on_long_press=lambda _: self.show_menu(),
+			on_long_press=self.pass_func,
 			content=ft.Container(
 				content=ft.Column(
 					[
@@ -425,6 +428,7 @@ class MyChatMessage(BaseChatMessage):
 					top_left=15, top_right=0, bottom_left=15, bottom_right=15
 				),
 				width=200,
+				on_click=lambda _: self.show_menu(),
 			),
 		)
 
@@ -507,7 +511,8 @@ class OtherChatMessage(BaseChatMessage):
 	def build_bubble(self, color):
 		# Code de ta bulle actuelle (avec max_width=200)
 		return ft.GestureDetector(
-			on_long_press=lambda _: self.show_menu(),
+			on_long_press=self.pass_func,
+			# on_long_press=lambda _: self.show_menu(),
 			content=ft.Container(
 				content=ft.Column(
 					[
@@ -527,7 +532,7 @@ class OtherChatMessage(BaseChatMessage):
 								ft.Text(self.message.message_time.strftime("%H:%M"), size=10),
 							],
 							alignment="end",
-							spacing=1,
+							spacing=2,
 						),
 					],
 					tight=True,
@@ -539,6 +544,7 @@ class OtherChatMessage(BaseChatMessage):
 					top_left=0, top_right=15, bottom_left=15, bottom_right=15
 				),
 				width=200,
+				on_click=lambda _: self.show_menu(),
 			),
 		)
 
@@ -839,27 +845,43 @@ async def ChatView(page: ft.Page):
 		page.show_dialog(report_dialog)
 
 	async def delete_message(e, msg: Message):
-		try:
-			response = await api.delete(endpoint=f"/message/{msg.id}")
 
-			if response.status_code != 204:
-				await show_top_toast(
-					page, response.json().get("detail", "Erreur lors de la suppression !"), True
-				)
-				return
-
+		async def cancel_delete(e):
 			page.pop_dialog()
-			await show_top_toast(page, "Message supprimé !")
 
-		except httpx.RequestError as ex:
-			await show_top_toast(page, "Erreur lors de la suppression !", True)
-			page.update()
-			return
-		# except Exception as e:
-		#     # En cas de problème réseau par exemple
-		#     await show_top_toast(page, "Erreur de connexion !", True)
-		#     print(f"Erreur connexion {e}")
-		#     return
+		async def confirm_delete(e):
+			try:
+				response = await api.delete(endpoint=f"/message/{msg.id}")
+
+				if response.status_code != 204:
+					await show_top_toast(
+						page, response.json().get("detail", "Erreur lors de la suppression !"), True
+					)
+					return
+
+				page.pop_dialog()
+				await show_top_toast(page, "Message supprimé !")
+
+			except httpx.RequestError as ex:
+				await show_top_toast(page, "Erreur lors de la suppression !", True)
+				page.update()
+				return
+			
+		page.pop_dialog()
+		dlg = ft.AlertDialog(
+			content=ft.Text("Voulez vous vraiment supprimer ce message ?"),
+			actions=[
+				ft.Button("Annuler", on_click=cancel_delete),
+				ft.Button("Supprimer", on_click=confirm_delete),
+			],
+		)
+		page.show_dialog(dlg)
+
+			# except Exception as e:
+			#     # En cas de problème réseau par exemple
+			#     await show_top_toast(page, "Erreur de connexion !", True)
+			#     print(f"Erreur connexion {e}")
+			#     return
 
 	async def send_click(e):
 		if not new_message.value.strip():
