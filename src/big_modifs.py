@@ -62,3 +62,166 @@ chat_container = ft.Container(
     ),
     bgcolor=ft.Colors.SURFACE,
 )
+
+# Swipe to reply
+# Exemple de structure simplifiée :
+bulle_de_chat = ft.Container(...) # Ta bulle actuelle
+
+message_avec_swipe = ft.Dismissible(
+    key=str(self.message.id), # Obligatoire pour un Dismissible
+    content=bulle_de_chat,
+    dismiss_direction=ft.DismissDirection.START_TO_END, # Glisser vers la droite
+    background=ft.Container(
+        bgcolor=ft.Colors.TRANSPARENT,
+        padding=10,
+        alignment=ft.alignment.center_left,
+        content=ft.Icon(ft.Icons.REPLY_ROUNDED, color=ft.Colors.PRIMARY)
+    ),
+    # C'est ici qu'est la magie : on bloque la disparition de l'élément !
+    confirm_dismiss=self.handle_swipe_reply 
+)
+
+# Fonction à ajouter dans ta classe :
+async def handle_swipe_reply(self, e: ft.DismissibleConfirmDismissEvent):
+    # On déclenche la réponse
+    await self.on_reply(self.message)
+    # On renvoie False pour que le message revienne à sa place (il n'est pas supprimé)
+    return False
+
+swipeable_message = ft.Dismissible(
+    key="1",
+    content=ft.Container(
+        content=bubble,
+        width=300,  # largeur max
+    ),
+    dismiss_direction=ft.DismissDirection.START_TO_END,
+    dismiss_thresholds={
+        ft.DismissDirection.START_TO_END: 0.1
+    },
+    on_dismiss=lambda e: print("Supprimé"),
+    background=ft.Container(
+        bgcolor=ft.Colors.RED,
+        alignment=ft.alignment.center_left,
+        padding=ft.Padding.only(left=10),
+        content=ft.Text("Supprimer")
+    ),
+    # Ajoute éventuellement une animation ou limite ici
+)
+
+
+
+
+Salut ! C'est une excellente feuille de route. Tu as une très bonne vision de ce que doit être une application de chat moderne.
+On va décortiquer ça point par point, en gardant en tête nos contraintes : Flet 0.80.5, l'optimisation pour mobile (.apk), et surtout les piliers de CIF Connect (notamment l'anonymat).
+Voici mon analyse et comment implémenter tout ça.
+1. Le bouton Retour et le Menu (3 points) dans l'AppBar
+C'est la modification la plus simple. On va utiliser un ft.PopupMenuButton pour les options, et un ft.IconButton pour le retour.
+Voici à quoi doit ressembler ton app_bar mis à jour :
+app_bar = ft.AppBar(
+    # --- BOUTON RETOUR ---
+    leading=ft.IconButton(
+        icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, 
+        on_click=lambda _: page.go("/rooms") # Utilise page.go() pour la navigation Flet moderne
+    ),
+    leading_width=40,
+    
+    # --- TITRE CLIQUABLE (Pour les infos du salon) ---
+    title=ft.GestureDetector(
+        on_tap=lambda _: page.go(f"/room_info/{current_room_id}"), # On verra cette vue plus bas
+        content=ft.Text(current_room_name, size=20, weight="bold", color="onsurface"),
+    ),
+    center_title=False,
+    bgcolor="surface",
+    elevation=2,
+    
+    # --- MENU 3 POINTS ---
+    actions=[
+        ft.PopupMenuButton(
+            items=[
+                ft.PopupMenuItem(icon=ft.Icons.SEARCH, text="Rechercher un message"),
+                # On peut conditionner cet affichage si l'utilisateur est admin du salon :
+                # ft.PopupMenuItem(icon=ft.Icons.EDIT, text="Modifier le salon") if is_admin else None,
+                ft.PopupMenuItem(), # Séparateur visuel (ligne)
+                ft.PopupMenuItem(
+                    icon=ft.Icons.LOGOUT_ROUNDED, 
+                    text="Quitter le salon", 
+                    on_click=go_to_rooms # Ton ancienne fonction
+                ),
+            ]
+        ),
+    ],
+)
+
+2. Le fond d'écran (Style WhatsApp)
+Flet permet de mettre une image en fond très facilement. Il te suffit d'envelopper ta chat_list dans un ft.Container avec une image en répétition.
+Note : Tu devras ajouter une petite image (ex: pattern.png) dans le dossier assets de ton projet.
+# Dans ton return ft.View, modifie le Container central :
+ft.Container(
+    content=chat_list,
+    padding=0,
+    expand=True,
+    # --- AJOUT DU FOND ---
+    image_src="assets/pattern.png", # Ton image de fond
+    image_repeat=ft.ImageRepeat.REPEAT,
+    image_fit=ft.ImageFit.CONTAIN,
+    image_opacity=0.05, # Très léger pour que ça s'adapte au mode sombre/clair sans gêner la lecture
+)
+
+3. Glisser pour répondre (Swipe to reply)
+C'est un super ajout UX. En Flet mobile, on utilise le contrôle ft.Dismissible. Normalement c'est fait pour "supprimer" en glissant, mais on va le tromper : on va intercepter le glissement, annuler la suppression, et déclencher ta fonction on_reply.
+Dans ta classe BaseChatMessage (ou au moment de créer la bulle), tu dois l'envelopper :
+# Exemple de structure simplifiée :
+bulle_de_chat = ft.Container(...) # Ta bulle actuelle
+
+message_avec_swipe = ft.Dismissible(
+    key=str(self.message.id), # Obligatoire pour un Dismissible
+    content=bulle_de_chat,
+    dismiss_direction=ft.DismissDirection.START_TO_END, # Glisser vers la droite
+    background=ft.Container(
+        bgcolor=ft.Colors.TRANSPARENT,
+        padding=10,
+        alignment=ft.alignment.center_left,
+        content=ft.Icon(ft.Icons.REPLY_ROUNDED, color=ft.Colors.PRIMARY)
+    ),
+    # C'est ici qu'est la magie : on bloque la disparition de l'élément !
+    confirm_dismiss=self.handle_swipe_reply 
+)
+
+# Fonction à ajouter dans ta classe :
+async def handle_swipe_reply(self, e: ft.DismissibleConfirmDismissEvent):
+    # On déclenche la réponse
+    await self.on_reply(self.message)
+    # On renvoie False pour que le message revienne à sa place (il n'est pas supprimé)
+    return False
+
+4. Le bouton Emojis (La dure réalité)
+Je vais être franc : Flet n'a pas de clavier à emojis intégré.
+Pour une application native Flet (Mobile), la meilleure pratique (et de loin) est de laisser l'utilisateur utiliser la touche emoji de son propre clavier Android/iOS.
+Si tu essaies de fabriquer un clavier emoji toi-même (un GridView avec 300 boutons textuels), ça va alourdir ton application et ça ne sera jamais aussi fluide que le clavier natif du téléphone. Je te conseille vivement d'ignorer ce bouton et de te reposer sur le clavier de l'OS.
+5. Reprendre là où on a quitté
+Pour faire ça, il faut mémoriser le dernier message lu. Puisque nous avons décidé d'utiliser SharedPreferences(), voici la logique :
+ * Quand l'utilisateur quitte le salon, tu sauvegardes l'ID du dernier message affiché.
+ * Quand il rouvre le salon, tu dis à Flet de scroller jusqu'à ce composant.
+<!-- end list -->
+# 1. Sauvegarder (lorsqu'on quitte ou reçoit un msg)
+sp = ft.SharedPreferences()
+await sp.set(f"last_read_{current_room_id}", last_message_id)
+
+# 2. Restaurer (après avoir chargé les messages dans chat_list)
+last_read = await sp.get(f"last_read_{current_room_id}")
+if last_read:
+    # Flet permet de scroller vers une "key" spécifique
+    chat_list.scroll_to(key=str(last_read), duration=300)
+else:
+    # Sinon, on va tout en bas
+    chat_list.scroll_to(offset=-1, duration=300)
+
+(Attention : il faut que tes messages dans la chat_list aient leur paramètre key=str(message.id) pour que ça fonctionne).
+6. La Vue "Infos du Salon" et l'Anonymat
+(Accessible en cliquant sur le titre de l'AppBar, voir point 1)
+Tu devras créer un nouveau fichier (ex: room_info_view.py).
+Mon avis sur l'affichage des utilisateurs : CIF Connect repose sur l'Anonymat Contrôlé. Afficher la liste des membres d'un salon peut être dangereux si on affiche des emails ou des vrais noms.
+ * Si tu affiches la liste : n'affiche que les pseudos (Adjectif + Animal) et l'avatar.
+ * Encore mieux pour un "Salon Général" : n'affiche pas de liste du tout, juste un compteur textuel : "👥 142 membres". Cela renforce le sentiment de sécurité et d'anonymat.
+Pour les options du salon, c'est une bonne idée de ne pas les répéter. Le menu "3 points" de l'AppBar du chat sert pour les actions rapides. La vue "Infos du Salon" sert pour l'administration (Changer la description, régénérer le code d'invitation, expulser un pseudo si on est admin).
+Quelle est la prochaine étape que tu veux attaquer ensemble ? On peut configurer le ft.Dismissible pour le swipe-to-reply, ou bien créer le squelette de la vue "Infos du Salon" ?

@@ -165,7 +165,7 @@ class MyChatMessage(BaseChatMessage):
         super().__init__(**kwargs)
         self.alignment = ft.MainAxisAlignment.END  # Aligné à droite
 
-        # Menu spécifique : Modifier, Supprimer, Répondre
+        # Menu spécifique : Copier, Modifier, Supprimer, Répondre
         self.menu_items = [
             ft.ListTile(
                 leading=ft.Icon(ft.Icons.CONTENT_COPY),
@@ -230,22 +230,43 @@ class MyChatMessage(BaseChatMessage):
             ),
         )
 
-        self.controls = [
-            ft.Stack(
-                [
-                    ft.Column(
-                        [bubble, ft.Container(height=10 if self.message.reactions else 0)],
-                        tight=True,
-                    ),
-                    ft.Container(content=self.get_reactions_row(), bottom=0, left=10),  # Réactions à gauche pour nos messages
-                ]
-            ),
-            ft.CircleAvatar(
-                content=ft.Text(get_initials(self.message.pseudo)),
-                bgcolor=get_avatar_color(self.message.pseudo, COLORS_LOOKUP),
-            ),
-            # Pas d'avatar à droite (style moderne) ou tu peux le rajouter après le stack
-        ]
+        bulle_complet = ft.Row(
+            [
+                ft.Stack(
+                    [
+                        ft.Column(
+                            [bubble, ft.Container(height=10 if self.message.reactions else 0)],
+                            tight=True,
+                        ),
+                        ft.Container(content=self.get_reactions_row(), bottom=0, left=10),  # Réactions à gauche pour nos messages
+                    ],
+                ),
+                ft.CircleAvatar(
+                    content=ft.Text(get_initials(self.message.pseudo)),
+                    bgcolor=get_avatar_color(self.message.pseudo, COLORS_LOOKUP),
+                ),
+            ]
+        )
+
+        message_avec_swipe = ft.Dismissible(
+            key=str(self.message.id),  # Obligatoire pour un Dismissible
+            content=bulle_complet,
+            dismiss_thresholds={ft.DismissDirection.START_TO_END: 0.1},
+            dismiss_direction=ft.DismissDirection.START_TO_END,  # Glisser vers la droite
+            background=ft.Container(bgcolor=ft.Colors.TRANSPARENT, padding=10, alignment=ft.Alignment.CENTER_LEFT, content=ft.Icon(ft.Icons.REPLY_ROUNDED, color=ft.Colors.PRIMARY)),
+            # C'est ici qu'est la magie : on bloque la disparition de l'élément !
+            on_confirm_dismiss=self.handle_swipe_reply,
+        )
+
+        self.controls = [message_avec_swipe]
+
+    # Fonction à ajouter dans ta classe :
+    async def handle_swipe_reply(self, e: ft.DismissibleDismissEvent):
+        # On déclenche la réponse
+        await self.on_reply(self.message)
+        await e.control.confirm_dismiss(False)
+        # On renvoie False pour que le message revienne à sa place (il n'est pas supprimé)
+        return False
 
     def show_menu(self):
         self._page_ref.bottom_sheet = ft.BottomSheet(ft.Container(ft.Column(self.menu_items, tight=True), padding=10))
