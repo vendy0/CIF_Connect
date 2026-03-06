@@ -209,7 +209,7 @@ def get_colors():
     return cols
 
 
-def get_avatar_color(username, colors_lookup):
+def get_avatar_color(username, colors_lookup=get_colors()):
     # Création d'un hash unique à partir du pseudo
     # (Contrairement à hash(), hashlib est constant entre les redémarrages)
     hash_object = hashlib.md5(username.encode())
