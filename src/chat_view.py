@@ -314,7 +314,6 @@ class BaseChatMessage(ft.Row):
                             max_lines=1,
                             overflow=ft.TextOverflow.ELLIPSIS,
                             italic=True,
-                            selectable=True,
                         ),
                     ],
                     spacing=1,
@@ -397,7 +396,6 @@ class MyChatMessage(BaseChatMessage):
                         ft.Text(
                             self.message.content,
                             size=15,
-                            selectable=True,
                             color=ft.Colors.ON_PRIMARY_CONTAINER,
                         ),
                         ft.Row(
@@ -589,13 +587,13 @@ async def ChatView(page: ft.Page):
         await show_top_toast(page, "Erreur réseau !", True)
         return
 
-    except Exception as e:
-        # En cas de problème réseau par exemple
-        await show_top_toast(page, "Erreur de connexion !", True)
-        await page.push_route("/rooms")
-        return
-    finally:
-        pass
+    # except Exception as e:
+    #     # En cas de problème réseau par exemple
+    #     await show_top_toast(page, "Erreur de connexion !", True)
+    #     await page.push_route("/rooms")
+    #     return
+    # finally:
+    #     pass
 
     reply_banner = ft.Container(
         visible=False,
@@ -673,17 +671,17 @@ async def ChatView(page: ft.Page):
                 await show_top_toast(page, "Erreur réseau !", True)
                 await page.push_route("/rooms")
                 return
-            except Exception as e:
-                # En cas de problème réseau par exemple
-                await show_top_toast(page, "Erreur server !", True)
-                # print(e)
-                await page.push_route("/rooms")
-                return
-            finally:
-                pass
+            # except Exception as e:
+            #     # En cas de problème réseau par exemple
+            #     await show_top_toast(page, "Erreur server !", True)
+            #     # print(e)
+            #     await page.push_route("/rooms")
+            #     return
 
         async def fermer_dialogue(e):
             page.pop_dialog()
+            
+        page.pop_dialog()
 
         edit_message_input = ft.TextField(value=msg.content, label="Message", multiline=True, autofocus=True)
         dlg = ft.AlertDialog(
@@ -721,13 +719,11 @@ async def ChatView(page: ft.Page):
                 await show_top_toast(page, "Erreur réseau !", True)
                 await page.push_route("/rooms")
                 return
-            except Exception as e:
-                # En cas de problème réseau par exemple
-                await show_top_toast("Erreur server !")
-                await page.push_route("/rooms")
-                return
-            finally:
-                pass
+            # except Exception as e:
+            #     # En cas de problème réseau par exemple
+            #     await show_top_toast("Erreur server !")
+            #     await page.push_route("/rooms")
+            #     return
 
         # Construction de la grille d'emojis
         emoji_row = ft.Row(
@@ -767,14 +763,12 @@ async def ChatView(page: ft.Page):
                 report_reason_input.error = "Serveur injoignable"
                 page.update()
                 return
-            except Exception as e:
-                # En cas de problème réseau par exemple
-                report_reason_input.error = "Erreur de connexion !"
-                page.update()
-                await show_top_toast(page, "Erreur de connexion !", True)
-                return
-            finally:
-                pass
+            # except Exception as e:
+            #     # En cas de problème réseau par exemple
+            #     report_reason_input.error = "Erreur de connexion !"
+            #     page.update()
+            #     await show_top_toast(page, "Erreur de connexion !", True)
+            #     return
 
         def cancel_report(e):
             report_dialog.open = False
@@ -810,25 +804,24 @@ async def ChatView(page: ft.Page):
                 await show_top_toast(page, response.json().get("detail", "Erreur lors de la suppression !"), True)
                 return
 
+            page.pop_dialog()
             await show_top_toast(page, "Message supprimé !")
 
         except httpx.RequestError as ex:
             await show_top_toast(page, "Erreur lors de la suppression !", True)
             page.update()
             return
-        except Exception as e:
-            # En cas de problème réseau par exemple
-            await show_top_toast(page, "Erreur de connexion !", True)
-            print(f"Erreur connexion {e}")
-            return
-        finally:
-            pass
+        # except Exception as e:
+        #     # En cas de problème réseau par exemple
+        #     await show_top_toast(page, "Erreur de connexion !", True)
+        #     print(f"Erreur connexion {e}")
+        #     return
 
     async def send_click(e):
-        if not new_message.value:
+        if not new_message.value.strip():
             return
 
-        text = new_message.value
+        # await ft.Clipboard().set(value=new_message.value.strip())
 
         parent_id = replying_to_message.id if replying_to_message else None
         # 3. On demande la liste fraîche au serveur
@@ -843,10 +836,13 @@ async def ChatView(page: ft.Page):
                 page.update()
                 return
 
+            print(response)
             message = response.json()
             print(message)
 
+            new_message.error = None
             new_message.value = ""
+            await cancel_reply(None)
             await new_message.focus()
             page.update()
 
@@ -874,17 +870,12 @@ async def ChatView(page: ft.Page):
             new_message.error = "Erreur, Message non envoyé !"
             page.update()
             return
-        except Exception as e:
-            # En cas de problème réseau par exemple
-            await show_top_toast(page, "Erreur de connexion !", True)
-            print(f"Erreur connexion {e}")
-            new_message.error = "Erreur connexion !"
-            return
-
-        new_message.value = ""
-        await cancel_reply(None)
-        await new_message.focus()
-        page.update()
+        # except Exception as e:
+        #     # En cas de problème réseau par exemple
+        #     await show_top_toast(page, "Erreur de connexion !", True)
+        #     print(f"Erreur connexion {e}")
+        #     new_message.error = "Erreur connexion !"
+        #     return
 
     def on_message(message: Message):
         if message.message_type in ["join", "quit"]:

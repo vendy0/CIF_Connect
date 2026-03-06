@@ -83,7 +83,7 @@ class APIClient:
         return response
 
     async def post(self, endpoint: str, data: dict):
-        await self.client.post(endpoint, json=data)
+        response = await self.client.post(endpoint, json=data)
         return response
 
     async def put(self, endpoint: str, data: dict):
