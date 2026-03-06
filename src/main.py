@@ -66,4 +66,4 @@ async def main(page: ft.Page):
 
 if __name__ == "__main__":
 	# ft.run est le bon standard pour 0.80.5
-	ft.run(main, assets_dir="../assets", port=8550)
+	ft.run(main, assets_dir="./assets", port=8550)
