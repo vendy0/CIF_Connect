@@ -18,8 +18,8 @@
 # - Modifier et supprimer un salon
 # - Changer la couleur du pseudo
 # - Copier un message (ft.Clipboard().set(message))
-# - Je devrait peut-être faire un soft delete. Quand on repond a un message supprimé, le parent_bubble disparait.
 """
+# - Je devrait peut-être faire un soft delete. Quand on repond a un message supprimé, le parent_bubble disparait.
 # - Sauvegarder le pseudo changé en bdd
 # - Changer les print pour utiliser des barres d'infos
 # - Délimiteur parent message dans le front
