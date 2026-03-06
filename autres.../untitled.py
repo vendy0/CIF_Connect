@@ -13,7 +13,12 @@
 # - Reprendre une Room la où l'on s'est arrêté
 # - Rechercher un message
 # - Taguer
+# - Fond d'écran
+# - Émoji
+# - Modifier et supprimer un salon
+# - Changer la couleur du pseudo
 """
+# - Sauvegarder le pseudo changé en bdd
 # - Changer les print pour utiliser des barres d'infos
 # - Délimiteur parent message dans le front
 # - Informer par snack bar ou qlq chose de plus stylé

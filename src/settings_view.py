@@ -57,12 +57,6 @@ async def SettingsView(page: ft.Page):
 				page.update()
 				return
 
-			# # Mise à jour de l'affichage dans la liste sans recharger la page
-			# pseudo_display_text.value = actuel_pseudo
-			# await storage.set("user_pseudo", actuel_pseudo)
-			# dlg.open = False
-			# page.update()
-
 			token = await storage.get("cif_token")
 			if not token:
 				await page.push_route("/login")
@@ -88,6 +82,7 @@ async def SettingsView(page: ft.Page):
 
 					pseudo_display_text.value = actuel_pseudo
 					await storage.set("user_pseudo", actuel_pseudo)
+					storage.update()
 					dlg.open = False
 					page.update()
 
