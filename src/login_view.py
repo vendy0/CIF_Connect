@@ -10,6 +10,8 @@ async def LoginView(page: ft.Page):
 	# Dans ton LoginView (Flet 0.80.5)
 	storage = ft.SharedPreferences()
 
+	# await storage.clear()
+
 	email_input = ft.TextField(
 		label="Email",
 		prefix_icon=ft.Icons.EMAIL,
@@ -37,7 +39,7 @@ async def LoginView(page: ft.Page):
 	async def login_success(token_data):
 		# On stocke le jeton pour les prochaines fois
 		await storage.set("cif_token", token_data["access_token"])
-		
+
 		api.set_token(token_data["access_token"])
 
 		# On peut aussi stocker le pseudo pour l'affichage rapide

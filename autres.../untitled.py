@@ -4,35 +4,34 @@
 # - Quand qlq'un change de pseudo faut l'avertir que ça se verra dans les rooms créés.
 # - Mot de passe oublié
 # - Quand il y a une nouvelle version
-# - Glisser pour répondre
 # - Mot de passe oublié
 # - Reprendre une Room la où l'on s'est arrêté
 # - Rechercher un message
 # - Taguer
-# - Fond d'écran
 # - Émoji
 # - Modifier et supprimer un salon
 # - Interface Administrateur
 # - Les marqueurs de dates visibles
 # - Annonces
 
-Analyse attentivement la chat_view. Maintenant voila ce dont j'ai besoin :
-- Un fond d'écran simple et doux qui s'adapte au thème à la manière de whatsapp
-- Glisser un message vers la droite pour y répondre (comme la plupart des applications de chat)
-- Le bouton qui affiche les émojis à gauche de la new_message_input (Je ne sais pas si flet possède des émojis préfabriqués)
-- Reprendre une Room là où l'on l'a quittée (Je n'ai absolument aucune idée de comment faire ça)
-- Puis une view quand on clique sur L'app bar qui affiche les infos du Salon (Nom, code invitation, description, Changer les informarions du salon (nom, description), Je ne sais pas si je peux afficher les utilisateurs même si c'est un adm pour l'anonymat, tu me donneras ton avis, avec les options qui vont suivre (Je ne sais pas si les répéter est une bonne chose))
+# Analyse attentivement la chat_view. Maintenant voila ce dont j'ai besoin :
+# - Un fond d'écran simple et doux qui s'adapte au thème à la manière de whatsapp
+# - Glisser un message vers la droite pour y répondre (comme la plupart des applications de chat)
+# - Le bouton qui affiche les émojis à gauche de la new_message_input (Je ne sais pas si flet possède des émojis préfabriqués)
+# - Reprendre une Room là où l'on l'a quittée (Je n'ai absolument aucune idée de comment faire ça)
+# - Puis une view quand on clique sur L'app bar qui affiche les infos du Salon (Nom, code invitation, description, Changer les informarions du salon (nom, description), Je ne sais pas si je peux afficher les utilisateurs même si c'est un adm pour l'anonymat, tu me donneras ton avis, avec les options qui vont suivre (Je ne sais pas si les répéter est une bonne chose))
 
-* Remplacer le bouton pour sortir de la Room par un menu (3 points) avec des options:
-- Rechercher un message
-- Quitter le Salon
-- Modifier et supprimer un salon (Si on est adm du salon)
-- Et d'autres truc interessants
+# * Remplacer le bouton pour sortir de la Room par un menu (3 points) avec des options:
+# - Rechercher un message
+# - Quitter le Salon
+# - Modifier et supprimer un salon (Si on est adm du salon)
+# - Et d'autres truc interessants
 
-- Puis un bouton à gauche de l'app bar pour retourner à la rooms_view
-
+# - Puis un bouton à gauche de l'app bar pour retourner à la rooms_view
 
 """
+# - Glisser pour répondre
+# - Fond d'écran
 # - Avant d'envoyer vers bdd, vérifier si il y a changement
 # - Generate secure code
 # - Changer la couleur du pseudo
@@ -49,8 +48,8 @@ Analyse attentivement la chat_view. Maintenant voila ce dont j'ai besoin :
 
 # Un dictionnaire pour tout centraliser
 utilisateurs_actifs = {
-    websocket_A: {"pseudo": "Lion Courageux", "email": "eleve1@interfamilia.com"},
-    websocket_B: {"pseudo": "Chat Malicieux", "email": "eleve2@interfamilia.com"},
+	websocket_A: {"pseudo": "Lion Courageux", "email": "eleve1@interfamilia.com"},
+	websocket_B: {"pseudo": "Chat Malicieux", "email": "eleve2@interfamilia.com"},
 }
 
 
@@ -60,8 +59,8 @@ message_complet = f"{expediteur_pseudo} : {message_recu}"
 
 # On boucle sur tout le monde pour diffuser
 for client_socket, infos in utilisateurs_actifs.items():
-    if client_socket != websocket_actuel:
-        await client_socket.send_text(message_complet)
+	if client_socket != websocket_actuel:
+		await client_socket.send_text(message_complet)
 
 """
 class ConnectionManager:
@@ -97,31 +96,31 @@ class ConnectionManager:
 
 
 class ConnectionManager:
-    def __init__(self):
-        # Le dictionnaire principal : {websocket: {"pseudo": "...", "is_shadowbanned": ...}}
-        self.active_connections = {}
+	def __init__(self):
+		# Le dictionnaire principal : {websocket: {"pseudo": "...", "is_shadowbanned": ...}}
+		self.active_connections = {}
 
-    async def connect(self, websocket, user_info):
-        """Appelé quand un élève ouvre l'application."""
-        await websocket.accept()
-        self.active_connections[websocket] = user_info
+	async def connect(self, websocket, user_info):
+		"""Appelé quand un élève ouvre l'application."""
+		await websocket.accept()
+		self.active_connections[websocket] = user_info
 
-    def disconnect(self, websocket):
-        """Appelé quand l'élève ferme l'application ou perd internet."""
-        if websocket in self.active_connections:
-            del self.active_connections[websocket]
+	def disconnect(self, websocket):
+		"""Appelé quand l'élève ferme l'application ou perd internet."""
+		if websocket in self.active_connections:
+			del self.active_connections[websocket]
 
-    async def broadcast(self, sender_socket):
-        # Si l'expéditeur est shadowbanned, on arrête tout
-        if user_info.get("is_shadowbanned"):
-            return
+	async def broadcast(self, sender_socket):
+		# Si l'expéditeur est shadowbanned, on arrête tout
+		if user_info.get("is_shadowbanned"):
+			return
 
-        for connection in self.active_connections:
-            if connection == sender_socket:
-                continue
-            try:
-                # On tente l'envoi
-                await connection.send_text(f"{pseudo} : {message}")
-            except:
-                # Si ça échoue, c'est que l'élève est parti
-                self.disconnect(connection)
+		for connection in self.active_connections:
+			if connection == sender_socket:
+				continue
+			try:
+				# On tente l'envoi
+				await connection.send_text(f"{pseudo} : {message}")
+			except:
+				# Si ça échoue, c'est que l'élève est parti
+				self.disconnect(connection)
