@@ -50,7 +50,7 @@ class Room:
         self.code: str = code
 
         self.controls = ft.ListTile(
-            key=self.id,
+            key=str(self.id),
             leading=ft.Icon(icon=self.icon, color=ft.Colors.BLUE_600),
             title=ft.Text(self.name, weight="bold"),
             subtitle=ft.Text(self.description),
@@ -62,7 +62,7 @@ class Room:
     async def join_room(self, e):
         self.page.session.store.set("current_room_id", self.id)
         self.page.session.store.set("current_room_name", self.name)
-        asyncio.create_task(self.page.push_route(route="/chat"))
+        await self.page.push_route(route="/chat")
 
 
 host = "127.0.0.1"  # Ton IP
@@ -83,7 +83,7 @@ class APIClient:
         response = await self.client.get(endpoint)
         return response
 
-    async def post(self, endpoint: str, data: dict= None):
+    async def post(self, endpoint: str, data: dict = None):
         response = await self.client.post(endpoint, json=data)
         return response
 

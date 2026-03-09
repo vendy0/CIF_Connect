@@ -16,15 +16,7 @@ async def LoginView(page: ft.Page):
     # Dans ton LoginView (Flet 0.80.5)
     storage = ft.SharedPreferences()
 
-    email_input = ft.TextField(
-        label="Email",
-        prefix_icon=ft.Icons.EMAIL,
-        border_radius=10,
-        multiline=False,
-        on_submit=lambda e: page.run_task(password_input.focus),
-    )
-    password_input = ft.TextField(label="Mot de passe", prefix_icon=ft.Icons.LOCK, password=True, can_reveal_password=True, border_radius=10, multiline=False, on_submit=password_submit)
-    confirm_password_input = ft.TextField(label="Confirmer le mot de passe", prefix_icon=ft.Icons.LOCK_OUTLINE, password=True, can_reveal_password=True, border_radius=10, on_submit=handle_submit)
+
 
     async def login_success(token_data):
         # On stocke le jeton pour les prochaines fois
@@ -105,15 +97,17 @@ async def LoginView(page: ft.Page):
                     email_input.error = "Serveur injoignable"
                     page.update()
 
-                # Erreur dans ton code Python (ex: faute de frappe, variable manquante)
-                except Exception as ex:
-                    print(f"BINGO ! Erreur Python interceptée : {ex}")
-                    email_input.error = f"Erreur interne au code"
-                    page.update()
-
     main_button = ft.Button(width=220, height=50, on_click=handle_submit)
     toggle_button = ft.TextButton()
-
+    email_input = ft.TextField(
+        label="Email",
+        prefix_icon=ft.Icons.EMAIL,
+        border_radius=10,
+        multiline=False,
+        on_submit=lambda e: page.run_task(password_input.focus),
+    )
+    password_input = ft.TextField(label="Mot de passe", prefix_icon=ft.Icons.LOCK, password=True, can_reveal_password=True, border_radius=10, multiline=False, on_submit=password_submit)
+    confirm_password_input = ft.TextField(label="Confirmer le mot de passe", prefix_icon=ft.Icons.LOCK_OUTLINE, password=True, can_reveal_password=True, border_radius=10, on_submit=handle_submit)
     def build_form():
         if is_register_mode:
             title = "Créer un compte"
