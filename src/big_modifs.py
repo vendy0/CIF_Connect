@@ -238,108 +238,109 @@
 # Dans ton chat_view.py, tu as commenté # ft.Stack(scroll_btn), à la fin de ta vue. C'est normal que ça n'ait pas marché : un Stack a besoin d'entourer l'élément sur lequel il flotte.
 # La solution : Enveloppe ton chat_container et ton bouton dans le même Stack, et utilise ft.Expanded (ou expand=True) pour qu'il prenne l'espace central.
 # Remplace la partie return ft.View(...) de ton chat_view.py par ceci :
-    return ft.View(
-        route="/chat",
-        controls=[
-            app_bar,
-            # Le Stack entoure la liste ET le bouton
-            ft.Container(
-                content=ft.Stack(
-                    controls=[
-                        chat_container, # Ta liste avec le fond d'écran
-                        ft.Container(
-                            content=scroll_btn, 
-                            bottom=10, 
-                            right=10
-                        ) # Le bouton positionné en bas à droite
-                    ],
-                    expand=True,
-                ),
-                expand=True,
-                padding=0,
-            ),
-            # La zone de saisie en bas (reply_banner + new_message)
-            ft.Container(
-                content=ft.Column(
-                    spacing=0,
-                    controls=[
-                        reply_banner,
-                        ft.Row([new_message, ft.IconButton(icon=ft.Icons.SEND_ROUNDED, icon_color="blue", on_click=send_click)]),
-                    ],
-                ),
-                padding=ft.padding.Padding(left=10, top=5, right=10, bottom=15),
-            ),
-        ],
-    )
+#     return ft.View(
+#         route="/chat",
+#         controls=[
+#             app_bar,
+#             # Le Stack entoure la liste ET le bouton
+#             ft.Container(
+#                 content=ft.Stack(
+#                     controls=[
+#                         chat_container, # Ta liste avec le fond d'écran
+#                         ft.Container(
+#                             content=scroll_btn, 
+#                             bottom=10, 
+#                             right=10
+#                         ) # Le bouton positionné en bas à droite
+#                     ],
+#                     expand=True,
+#                 ),
+#                 expand=True,
+#                 padding=0,
+#             ),
+#             # La zone de saisie en bas (reply_banner + new_message)
+#             ft.Container(
+#                 content=ft.Column(
+#                     spacing=0,
+#                     controls=[
+#                         reply_banner,
+#                         ft.Row([new_message, ft.IconButton(icon=ft.Icons.SEND_ROUNDED, icon_color="blue", on_click=send_click)]),
+#                     ],
+#                 ),
+#                 padding=ft.padding.Padding(left=10, top=5, right=10, bottom=15),
+#             ),
+#         ],
+#     )
 
-2. La Date "Sticky" (Style WhatsApp)
-Je vais être très franc avec toi : Flet (même en 0.80.5) ne gère pas nativement les "Sticky Headers" dans une ListView de manière fluide.
-Pour faire comme WhatsApp (la date reste collée en haut, puis est poussée par la date suivante), il faudrait calculer la position en pixels de chaque séparateur de date pendant le scroll. En Python/Flet, cet événement on_scroll est envoyé depuis le client mobile vers le serveur Python, ce qui crée un léger décalage (lag) insupportable pour l'UX si on essaie de mettre à jour un composant flottant à chaque pixel.
-Mon conseil : Garde tes séparateurs de date actuels (date_divider) insérés directement entre les messages. C'est la méthode la plus stable, performante et propre sur Flet mobile.
-3. Rechercher un message
-L'astuce consiste à remplacer l'AppBar classique par une barre de recherche quand on clique sur l'option du menu.
-Dans chat_view.py, juste avant la définition de ton app_bar, ajoute cette logique :
-    search_input = ft.TextField(
-        hint_text="Rechercher...",
-        expand=True,
-        autofocus=True,
-        border=ft.InputBorder.NONE,
-        on_change=lambda e: filter_messages(e.control.value)
-    )
+# 2. La Date "Sticky" (Style WhatsApp)
+# Je vais être très franc avec toi : Flet (même en 0.80.5) ne gère pas nativement les "Sticky Headers" dans une ListView de manière fluide.
+# Pour faire comme WhatsApp (la date reste collée en haut, puis est poussée par la date suivante), il faudrait calculer la position en pixels de chaque séparateur de date pendant le scroll. En Python/Flet, cet événement on_scroll est envoyé depuis le client mobile vers le serveur Python, ce qui crée un léger décalage (lag) insupportable pour l'UX si on essaie de mettre à jour un composant flottant à chaque pixel.
+# Mon conseil : Garde tes séparateurs de date actuels (date_divider) insérés directement entre les messages. C'est la méthode la plus stable, performante et propre sur Flet mobile.
 
-    def filter_messages(query: str):
-        query = query.lower()
-        # On parcourt les éléments de la chat_list
-        for ctrl in chat_list.controls:
-            if isinstance(ctrl, (MyChatMessage, OtherChatMessage)):
-                # Si le texte correspond, on affiche, sinon on cache
-                ctrl.visible = query in ctrl.message.content.lower()
-        page.update()
+# 3. Rechercher un message
+# L'astuce consiste à remplacer l'AppBar classique par une barre de recherche quand on clique sur l'option du menu.
+# Dans chat_view.py, juste avant la définition de ton app_bar, ajoute cette logique :
+#     search_input = ft.TextField(
+#         hint_text="Rechercher...",
+#         expand=True,
+#         autofocus=True,
+#         border=ft.InputBorder.NONE,
+#         on_change=lambda e: filter_messages(e.control.value)
+#     )
 
-    def toggle_search(e):
-        # On remplace le titre par l'input, et on change les boutons
-        if app_bar.title == search_input:
-            # Annuler la recherche
-            app_bar.title = ft.GestureDetector(content=ft.Text(current_room_name, size=20, weight="bold"))
-            app_bar.actions = [default_menu]
-            filter_messages("") # On réaffiche tout
-        else:
-            # Activer la recherche
-            app_bar.title = search_input
-            app_bar.actions = [ft.IconButton(ft.Icons.CLOSE, on_click=toggle_search)]
-        page.update()
+#     def filter_messages(query: str):
+#         query = query.lower()
+#         # On parcourt les éléments de la chat_list
+#         for ctrl in chat_list.controls:
+#             if isinstance(ctrl, (MyChatMessage, OtherChatMessage)):
+#                 # Si le texte correspond, on affiche, sinon on cache
+#                 ctrl.visible = query in ctrl.message.content.lower()
+#         page.update()
 
-    default_menu = ft.PopupMenuButton(
-        items=[
-            ft.PopupMenuItem(icon=ft.Icons.SEARCH, content=ft.Text("Rechercher un message"), on_click=toggle_search),
-            ft.PopupMenuItem(),
-            ft.PopupMenuItem(icon=ft.Icons.LOGOUT_ROUNDED, content=ft.Text("Quitter le salon"), on_click=left_room),
-        ]
-    )
+#     def toggle_search(e):
+#         # On remplace le titre par l'input, et on change les boutons
+#         if app_bar.title == search_input:
+#             # Annuler la recherche
+#             app_bar.title = ft.GestureDetector(content=ft.Text(current_room_name, size=20, weight="bold"))
+#             app_bar.actions = [default_menu]
+#             filter_messages("") # On réaffiche tout
+#         else:
+#             # Activer la recherche
+#             app_bar.title = search_input
+#             app_bar.actions = [ft.IconButton(ft.Icons.CLOSE, on_click=toggle_search)]
+#         page.update()
 
-N'oublie pas d'assigner default_menu à la propriété actions=[default_menu] de ton AppBar.
-4. Compteur de non-lus & Reprise (Logique)
-Puisque tu utilises SharedPreferences, voici la stratégie à adopter dans ta boucle qui génère les salons dans rooms_view.py :
- * Tu sauvegardes le format ISO de la date du dernier message lu en quittant le chat : storage.set(f"last_read_date_{room_id}", "2026-03-09T10:30:00").
- * Dans rooms_view.py, tu compares cette date avec la date du dernier message du salon (que ton API GET /rooms devra renvoyer).
- * Tu ajoutes un badge visuel dans ta classe Room (utils.py) :
-<!-- end list -->
-# Dans la définition de self.controls de la classe Room (utils.py)
-unread_badge = ft.Container(
-    content=ft.Text("3", size=10, color=ft.Colors.WHITE, weight="bold"),
-    bgcolor=ft.Colors.GREEN_500,
-    border_radius=10,
-    padding=ft.padding.symmetric(horizontal=6, vertical=2),
-    visible=True # À conditionner selon tes calculs de dates
-)
+#     default_menu = ft.PopupMenuButton(
+#         items=[
+#             ft.PopupMenuItem(icon=ft.Icons.SEARCH, content=ft.Text("Rechercher un message"), on_click=toggle_search),
+#             ft.PopupMenuItem(),
+#             ft.PopupMenuItem(icon=ft.Icons.LOGOUT_ROUNDED, content=ft.Text("Quitter le salon"), on_click=left_room),
+#         ]
+#     )
+# N'oublie pas d'assigner default_menu à la propriété actions=[default_menu] de ton AppBar.
 
-self.controls = ft.ListTile(
-    # ... tes autres propriétés
-    trailing=ft.Column([
-        ft.Text("10:37", size=10, color=ft.Colors.ON_SURFACE_VARIANT), # Heure du dernier msg
-        unread_badge
-    ], alignment=ft.MainAxisAlignment.CENTER, spacing=2),
-)
+# 4. Compteur de non-lus & Reprise (Logique)
+# Puisque tu utilises SharedPreferences, voici la stratégie à adopter dans ta boucle qui génère les salons dans rooms_view.py :
+#  * Tu sauvegardes le format ISO de la date du dernier message lu en quittant le chat : storage.set(f"last_read_date_{room_id}", "2026-03-09T10:30:00").
+#  * Dans rooms_view.py, tu compares cette date avec la date du dernier message du salon (que ton API GET /rooms devra renvoyer).
+#  * Tu ajoutes un badge visuel dans ta classe Room (utils.py) :
+# <!-- end list -->
+# # Dans la définition de self.controls de la classe Room (utils.py)
+# unread_badge = ft.Container(
+#     content=ft.Text("3", size=10, color=ft.Colors.WHITE, weight="bold"),
+#     bgcolor=ft.Colors.GREEN_500,
+#     border_radius=10,
+#     padding=ft.padding.symmetric(horizontal=6, vertical=2),
+#     visible=True # À conditionner selon tes calculs de dates
+# )
+
+# self.controls = ft.ListTile(
+#     # ... tes autres propriétés
+#     trailing=ft.Column([
+#         ft.Text("10:37", size=10, color=ft.Colors.ON_SURFACE_VARIANT), # Heure du dernier msg
+#         unread_badge
+#     ], alignment=ft.MainAxisAlignment.CENTER, spacing=2),
+# )
 
 5. La page Info du Salon (room_info.py)
 Voici le fichier complet pour la vue d'information du salon. L'interface permet la modification si l'utilisateur est le créateur. Pour préserver le principe d'anonymat du collège, la liste des membres n'affichera que les pseudos générés aléatoirement, garantissant un environnement sécurisé.
@@ -486,40 +487,40 @@ N'oublie pas d'ajouter cette vue dans la gestion de tes routes (route_change) da
 
 
 
-    # Plus besoin de dictionnaire, on stocke la tâche asynchrone directement
-    scroll_timer_task = None
+    # # Plus besoin de dictionnaire, on stocke la tâche asynchrone directement
+    # scroll_timer_task = None
 
-    async def list_scrolled(e: ft.OnScrollEvent):
-        nonlocal scroll_timer_task
+    # async def list_scrolled(e: ft.OnScrollEvent):
+    #     nonlocal scroll_timer_task
 
-        # Si on remonte suffisamment (plus de 100 pixels du bas)
-        if e.pixels < (e.max_scroll_extent - 100):
-            if not scroll_btn.visible:
-                scroll_btn.visible = True
-                scroll_btn.update()
+    #     # Si on remonte suffisamment (plus de 100 pixels du bas)
+    #     if e.pixels < (e.max_scroll_extent - 100):
+    #         if not scroll_btn.visible:
+    #             scroll_btn.visible = True
+    #             scroll_btn.update()
 
-            # Annuler le timer précédent s'il existe (Debounce)
-            if scroll_timer_task and not scroll_timer_task.done():
-                scroll_timer_task.cancel()
+    #         # Annuler le timer précédent s'il existe (Debounce)
+    #         if scroll_timer_task and not scroll_timer_task.done():
+    #             scroll_timer_task.cancel()
 
-            # Lancer un nouveau compte à rebours 100% asynchrone
-            async def hide_later():
-                try:
-                    await asyncio.sleep(2.0)
-                    scroll_btn.visible = False
-                    scroll_btn.update()
-                except asyncio.CancelledError:
-                    # La tâche a été annulée car l'utilisateur a continué de scroller. Tout va bien.
-                    pass
+    #         # Lancer un nouveau compte à rebours 100% asynchrone
+    #         async def hide_later():
+    #             try:
+    #                 await asyncio.sleep(2.0)
+    #                 scroll_btn.visible = False
+    #                 scroll_btn.update()
+    #             except asyncio.CancelledError:
+    #                 # La tâche a été annulée car l'utilisateur a continué de scroller. Tout va bien.
+    #                 pass
 
-            scroll_timer_task = asyncio.create_task(hide_later())
+    #         scroll_timer_task = asyncio.create_task(hide_later())
 
-        else:
-            # On est tout en bas, on cache le bouton immédiatement
-            if scroll_btn.visible:
-                scroll_btn.visible = False
-                scroll_btn.update()
+    #     else:
+    #         # On est tout en bas, on cache le bouton immédiatement
+    #         if scroll_btn.visible:
+    #             scroll_btn.visible = False
+    #             scroll_btn.update()
 
-            # On coupe le timer en cours
-            if scroll_timer_task and not scroll_timer_task.done():
-                scroll_timer_task.cancel()
+    #         # On coupe le timer en cours
+    #         if scroll_timer_task and not scroll_timer_task.done():
+    #             scroll_timer_task.cancel()

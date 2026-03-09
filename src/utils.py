@@ -39,6 +39,15 @@ async def decode_token(token):
         print(f"Erreur décodage token: {e}")
 
 
+unread_badge = ft.Container(
+    content=ft.Text("3", size=10, color=ft.Colors.WHITE, weight="bold"),
+    bgcolor=ft.Colors.GREEN_500,
+    border_radius=10,
+    padding=ft.padding.symmetric(horizontal=6, vertical=2),
+    visible=True,  # À conditionner selon tes calculs de dates
+)
+
+
 # Assurez-vous que les fichiers json sont dans le même dossier ou ajustez le cheminimport json
 class Room:
     def __init__(self, page, room_id, name, description, icon=ft.Icons.CHAT_BUBBLE_ROUNDED, code="ab12"):
@@ -54,9 +63,13 @@ class Room:
             leading=ft.Icon(icon=self.icon, color=ft.Colors.BLUE_600),
             title=ft.Text(self.name, weight="bold"),
             subtitle=ft.Text(self.description),
-            trailing=ft.Icon(ft.Icons.CHEVRON_RIGHT),
+            # trailing=ft.Icon(ft.Icons.CHEVRON_RIGHT),
             data=self.id,
             on_click=self.join_room,
+            trailing=ft.Column([
+                ft.Text("10:37", size=10, color=ft.Colors.ON_SURFACE_VARIANT), # Heure du dernier msg
+                unread_badge
+            ], alignment=ft.MainAxisAlignment.CENTER, spacing=2),
         )
 
     async def join_room(self, e):
@@ -209,8 +222,9 @@ def get_colors():
         return ["#FF5733", "#33FF57", "#3357FF", "#F0F0F0"]
     return cols
 
+COLORS_LOOKUP = get_colors()
 
-def get_avatar_color(username, colors_lookup=get_colors()):
+def get_avatar_color(username, colors_lookup=COLORS_LOOKUP):
     # Création d'un hash unique à partir du pseudo
     # (Contrairement à hash(), hashlib est constant entre les redémarrages)
     hash_object = hashlib.md5(username.encode())

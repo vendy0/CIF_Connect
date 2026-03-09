@@ -715,12 +715,6 @@ async def ChatView(page: ft.Page):
             new_message.error = "Erreur, Message non envoyé !"
             page.update()
             return
-        # except Exception as e:
-        #     # En cas de problème réseau par exemple
-        #     await show_top_toast(page, "Erreur de connexion !", True)
-        #     print(f"Erreur connexion {e}")
-        #     new_message.error = "Erreur connexion !"
-        #     return
 
     def on_message(message: Message):
         if message.message_type in ["join", "quit"]:
@@ -829,7 +823,7 @@ async def ChatView(page: ft.Page):
                     # Sinon, on va tout en bas
                     # await chat_list.scroll_to(offset=-1, duration=100)
 
-    await show_messages(messages_received, True)
+    page.run_task(show_messages, messages_received, True)
 
     page.pubsub.subscribe(on_message)
 
@@ -862,6 +856,38 @@ async def ChatView(page: ft.Page):
         )
         page.show_dialog(dlg)
 
+    search_input = ft.TextField(hint_text="Rechercher...", expand=True, autofocus=True, border=ft.InputBorder.NONE, on_change=lambda e: filter_messages(e.control.value))
+
+    def filter_messages(query: str):
+        query = query.lower()
+        # On parcourt les éléments de la chat_list
+        for ctrl in chat_list.controls:
+            if isinstance(ctrl, (MyChatMessage, OtherChatMessage)):
+                # Si le texte correspond, on affiche, sinon on cache
+                ctrl.visible = query in ctrl.message.content.lower()
+        page.update()
+
+    def toggle_search(e):
+        # On remplace le titre par l'input, et on change les boutons
+        if app_bar.title == search_input:
+            # Annuler la recherche
+            app_bar.title = ft.Row(controls=ft.Text(current_room_name, size=20, weight="bold"))
+            app_bar.actions = [default_menu]
+            filter_messages("")  # On réaffiche tout
+        else:
+            # Activer la recherche
+            app_bar.title = search_input
+            app_bar.actions = [ft.IconButton(ft.Icons.CLOSE, on_click=toggle_search)]
+        page.update()
+
+    default_menu = ft.PopupMenuButton(
+        items=[
+            ft.PopupMenuItem(icon=ft.Icons.SEARCH, content=ft.Text("Rechercher un message"), on_click=toggle_search),
+            ft.PopupMenuItem(),
+            ft.PopupMenuItem(icon=ft.Icons.LOGOUT_ROUNDED, content=ft.Text("Quitter le salon"), on_click=left_room),
+        ]
+    )
+
     app_bar = ft.AppBar(
         # --- BOUTON RETOUR ---
         leading=ft.IconButton(
@@ -871,28 +897,15 @@ async def ChatView(page: ft.Page):
         leading_width=40,
         # --- TITRE CLIQUABLE (Pour les infos du salon) ---
         title=ft.GestureDetector(
+            on_long_press=toggle_search,
             content=ft.Text(current_room_name, size=20, weight="bold", color="onsurface"),
-            on_tap=lambda _: page.push_route(f"/room_info/{current_room_id}"),  # On verra cette vue plus bas
+            on_tap=lambda _: page.run_task(page.push_route, f"/room_info/{current_room_id}"),  # On verra cette vue plus bas
         ),
         center_title=False,
         bgcolor="surface",
         elevation=2,
         # --- MENU 3 POINTS ---
-        actions=[
-            ft.PopupMenuButton(
-                items=[
-                    ft.PopupMenuItem(icon=ft.Icons.SEARCH, content="Rechercher un message"),
-                    # On peut conditionner cet affichage si l'utilisateur est admin du salon :
-                    # ft.PopupMenuItem(icon=ft.Icons.EDIT, text="Modifier le salon") if is_admin else None,
-                    ft.PopupMenuItem(),  # Séparateur visuel (ligne)
-                    ft.PopupMenuItem(
-                        icon=ft.Icons.LOGOUT_ROUNDED,
-                        content="Quitter le salon",
-                        on_click=left_room,  # Ton ancienne fonction
-                    ),
-                ]
-            ),
-        ],
+        actions=[default_menu],
     )
 
     # return ft.View(

@@ -15,6 +15,11 @@
 # - Interface Administrateur
 # - Les marqueurs de dates visibles
 # - Annonces
+# - Mettre les options de message dans le swipe
+# - Swipe de l'autre coté affiche la date ou un truc du genre
+# - Rechercher un message ne l'affiche pas mais swipe jusqu'à lui. Je pensais plutôt faire une requête api si l'utilisateur demande plus parce que le chat ne contient que les 100 derniers messages. Cette requête retournerais tous les messages jusqu'à celui qu'on cherche.
+# - Afficher les salons en fonction du dernier message. On gerera peut-être avec les websockets
+# - Comment je conditionne ce unread messages
 
 Maintenant je veux :
 Analyse attentivement ma chat_view

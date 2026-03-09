@@ -4,6 +4,7 @@ from chat_view import ChatView
 from settings_view import SettingsView
 from rooms_view import RoomsView
 from create_room_view import CreateRoomView
+from room_info_view import RoomInfoView
 from utils import generer_pseudo, view_pop, decode_token, api
 # import asyncio
 
@@ -25,6 +26,8 @@ async def main(page: ft.Page):
             page.views.append(await LoginView(page))
         elif page.route == "/rooms":
             page.views.append(await RoomsView(page))
+        elif page.route.startswith("/room_info/"):
+            page.views.append(await RoomInfoView(page))
         elif page.route == "/chat":
             page.views.append(await ChatView(page))
         elif page.route == "/settings":
