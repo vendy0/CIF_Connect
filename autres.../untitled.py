@@ -17,11 +17,15 @@
 # - Annonces
 
 Maintenant je veux :
-- Rechercher un message
-- La page info du salon
-- Quand on scroll ça doit afficher la dernière date (style whatsapp)
+Analyse attentivement ma chat_view
+- Rechercher un message dans le salon
+- Quand on scroll ça doit afficher la dernière date (style whatsapp). Quand on arrive à l'endroit où cette date délimite elle s'arrete et la date precedente prend le relai
+- Et puis je n'arrive pas à ajouter Scroll btn à la page
 - Pour le dernier message lu je comptais plutot utiliser la date pour reprendre la room où on l'a laissée
-- Afficher le nombre de messages non lus dans la room view (pour chaque room, style whatsapp)
+- Afficher le nombre de messages non lus dans la room view (pour chaque room, style whatsapp). J'optimiserai plus tard avec les websocket pour chaque nouveau message reçu
+
+* Je veux que tu me fournisses la page info du salon (room_info.py). Sur cette page l'adm va pouvoir modifier les infos du salons comme c'est indiqué dans le crud.py. On pourra voir le nombre de membres totaux et combien sont en ligne (ex: 30/126 online). Je crois que je pourrais aussi afficher ça dans l'AppBar.
+- Sur la page y aura aussi l3 nom du salon, l'icon flet du salon aussi et les autres détails que tu juges nécéssaire. Et aussi le code du salon
 
 # Analyse attentivement la chat_view. Maintenant voila ce dont j'ai besoin :
 # - Un fond d'écran simple et doux qui s'adapte au thème à la manière de whatsapp
