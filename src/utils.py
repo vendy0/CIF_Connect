@@ -50,6 +50,7 @@ class Room:
         self.code: str = code
 
         self.controls = ft.ListTile(
+            key=self.id,
             leading=ft.Icon(icon=self.icon, color=ft.Colors.BLUE_600),
             title=ft.Text(self.name, weight="bold"),
             subtitle=ft.Text(self.description),
@@ -82,11 +83,11 @@ class APIClient:
         response = await self.client.get(endpoint)
         return response
 
-    async def post(self, endpoint: str, data: dict):
+    async def post(self, endpoint: str, data: dict= None):
         response = await self.client.post(endpoint, json=data)
         return response
 
-    async def put(self, endpoint: str, data: dict):
+    async def put(self, endpoint: str, data: dict = None):
         response = await self.client.put(endpoint, json=data)
         return response
 

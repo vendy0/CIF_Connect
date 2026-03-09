@@ -211,35 +211,73 @@ def join_new_room(db: Session, join_data: JoinRoomSchema, user_id: int):
 	return room
 
 
+# def quit_room_func(db: Session, user_id: int, room_id: int):
+# 	user = db.execute(select(User).where(User.id == user_id)).scalar_one()
+
+# 	room = db.execute(
+# 		select(Room).where(Room.id == room_id, Room.users.any(User.id == user_id))
+# 	).scalar_one_or_none()
+
+# 	if not room:
+# 		raise HTTPException(status_code=404, detail="Vous ne faites pas partie de ce salon !")
+
+# 	room.users.remove(user)
+# 	db.flush()
+
+# 	# Message système
+# 	sys_msg = Message(
+# 		content=f"{user.pseudo} a quitté le salon.",
+# 		author_id=user.id,
+# 		room_id=room.id,
+# 		message_type="quit",
+# 		author_display_name=user.pseudo,
+# 	)
+# 	db.add(sys_msg)
+
+# 	db.commit()
+# 	db.refresh(room)
+
+# 	return room
+
 def quit_room_func(db: Session, user_id: int, room_id: int):
-	user = db.execute(select(User).where(User.id == user_id)).scalar_one()
+    # Récupère l'user (doit exister)
+    user = db.execute(select(User).where(User.id == user_id)).scalar_one()
 
-	room = db.execute(
-		select(Room).where(Room.id == room_id, Room.users.any(User.id == user_id))
-	).scalar_one_or_none()
+    # Récupère la room uniquement si l'user y est (protection)
+    room = db.execute(
+        select(Room).where(Room.id == room_id, Room.users.any(User.id == user_id))
+    ).scalar_one_or_none()
 
-	if not room:
-		raise HTTPException(status_code=404, detail="Vous ne faites pas partie de ce salon !")
+    if not room:
+        raise HTTPException(status_code=404, detail="Vous ne faites pas partie de ce salon !")
 
-	room.users.remove(user)
-	db.flush()
+    # Retire l'utilisateur de la relation many-to-many
+    room.users.remove(user)
+    db.flush()  # applique la suppression dans la session / DB
 
-	# Message système
-	sys_msg = Message(
-		content=f"{user.pseudo} a quitté le salon.",
-		author_id=user.id,
-		room_id=room.id,
-		message_type="quit",
-		author_display_name=user.pseudo,
-	)
-	db.add(sys_msg)
+    # Compte fiable des membres restants dans la room via la table d'association
+    remaining = db.execute(
+        select(func.count()).select_from(user_room).where(user_room.c.room_id == room_id)
+    ).scalar_one()
 
-	db.commit()
-	db.refresh(room)
+    # Si plus personne, on désactive la room
+    if remaining == 0:
+        room.active = False
 
-	return room
+    # Message système
+    sys_msg = Message(
+        content=f"{user.pseudo} a quitté le salon.",
+        author_id=user.id,
+        room_id=room.id,
+        message_type="quit",
+        author_display_name=user.pseudo,
+    )
+    db.add(sys_msg)
 
+    db.commit()
+    db.refresh(room)
 
+    return room
 # ==============================================================================
 # GESTION DES SALONS (SUITE)
 # ==============================================================================

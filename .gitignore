@@ -1,6 +1,7 @@
 # Database
 cif_connect_demo.db
 *db-journal
+.nomedia
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

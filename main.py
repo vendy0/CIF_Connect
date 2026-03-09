@@ -169,8 +169,8 @@ def join_room(
     return db_inter.join_new_room(db, data, current_user_id)
 
 
-@app.post("/user/rooms/{room_id}/quit", response_model=RoomSchema, tags=["Rooms"])
-def quit_room(room_id: int, user_id: int, db: Session = Depends(get_db)):
+@app.post("/user/rooms/{room_id}/quit", tags=["Rooms"], status_code=status.HTTP_204_NO_CONTENT)
+def quit_room(room_id: int, user_id: int = Depends(get_current_user), db: Session = Depends(get_db)):
     """Quitter un salon"""
     return db_inter.quit_room_func(db, user_id=user_id, room_id=room_id)
 
@@ -216,7 +216,7 @@ def edit_message(
     return db_inter.edit_message_func(db, message_id, data, user_id)
 
 
-@app.delete("/message/{message_id}", tags=["Messages"], status_code=204)
+@app.delete("/message/{message_id}", tags=["Messages"], status_code=status.HTTP_204_NO_CONTENT)
 def delete_message(message_id: int, user_id: int = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Supprimer un message.

@@ -103,7 +103,8 @@ class Room(Base):
 
 	created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
 	created_at = Column(DateTime, default=datetime.now().replace(microsecond=0), nullable=False)
-
+	
+	active = Column(Boolean, default=True, nullable = False)
 	# --- Relations ---
 	creator = relationship("User", back_populates="created_rooms")
 	users = relationship("User", secondary=user_room, back_populates="rooms")
