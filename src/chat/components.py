@@ -138,7 +138,7 @@ class MyChatMessage(BaseChatMessage):
             ft.ListTile(
                 leading=ft.Icon(ft.Icons.CONTENT_COPY),
                 title=ft.Text("Copier"),
-                on_click=lambda e: self._page_ref.run_task(self.on_copy, e, self.message),
+                on_click=lambda e: self._page_ref.run_task(self.on_copy, e, self._page_ref, self.message.content, "Message copié !"),
             ),
             ft.ListTile(
                 leading=ft.Icon(ft.Icons.EDIT),
@@ -213,7 +213,9 @@ class MyChatMessage(BaseChatMessage):
                     content=ft.Text(get_initials(self.message.pseudo)),
                     bgcolor=get_avatar_color(self.message.pseudo, COLORS_LOOKUP),
                 ),
-            ]
+            ],
+            vertical_alignment=ft.CrossAxisAlignment.START,  # Aligne le haut de l'avatar au haut de la bulle
+            alignment=ft.MainAxisAlignment.END,  # Garde le tout collé à droite
         )
 
         message_avec_swipe = ft.Dismissible(
@@ -249,7 +251,7 @@ class OtherChatMessage(BaseChatMessage):
             ft.ListTile(
                 leading=ft.Icon(ft.Icons.CONTENT_COPY),
                 title=ft.Text("Copier"),
-                on_click=lambda e: self._page_ref.run_task(self.on_copy, e, self.message),
+                on_click=lambda e: self._page_ref.run_task(self.on_copy, e, self._page_ref, self.message.content, "Message copié !"),
             ),
             ft.ListTile(
                 leading=ft.Icon(ft.Icons.REPLY),
@@ -287,9 +289,11 @@ class OtherChatMessage(BaseChatMessage):
                         ft.Container(content=self.get_reactions_row(), bottom=0, right=10),
                     ]
                 ),
-            ]
+            ],vertical_alignment=ft.CrossAxisAlignment.START,  # Aligne le haut de l'avatar au haut de la bulle
+            alignment=ft.MainAxisAlignment.START,  # Garde le tout collé à droite
+
         )
-        
+
         message_avec_swipe = ft.Dismissible(
             key=str(self.message.id),  # Obligatoire pour un Dismissible
             content=bulle_complet,

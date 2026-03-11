@@ -1,18 +1,11 @@
 import flet as ft
-from utils import generate_secure_code, host, port, api, show_top_toast
+from utils import generate_secure_code, host, port, api, show_top_toast, refresh_rooms
 import httpx
 from json import loads, dumps
 
 
 async def CreateRoomView(page: ft.Page):
     storage = ft.SharedPreferences()
-
-    async def store_room(room):
-        rooms_stored_str = await storage.get("rooms_cache")
-        rooms_stored = loads(rooms_stored_str)
-        rooms_stored.append(room)
-        await storage.set("rooms_cache", dumps(rooms_stored))
-        storage.update()
 
     # ==========================================================
     #                         STATE
@@ -114,7 +107,7 @@ async def CreateRoomView(page: ft.Page):
                 return
 
             room = response.json()
-            await store_room(room)
+            await refresh_rooms(page, storage)
             page.session.store.set("current_room_id", room["id"])
             page.session.store.set("current_room_name", room["name"])
             await page.push_route("/chat")
@@ -162,7 +155,7 @@ async def CreateRoomView(page: ft.Page):
                     return
 
                 room = response.json()
-                await store_room(room)
+                await refresh_rooms(page, storage)
                 page.session.store.set("current_room_id", room["id"])
                 page.session.store.set("current_room_name", room["name"])
                 await page.push_route("/chat")
@@ -180,17 +173,9 @@ async def CreateRoomView(page: ft.Page):
     # ==========================================================
     #                      CHAMPS INPUT
     # ==========================================================
-    room_name_input = ft.TextField(
-        label="Nom du salon",
-        width=400,
-    )
+    room_description_input = ft.TextField(label="Description", multiline=True, min_lines=3, width=400, on_submit=creer_room)
 
-    room_description_input = ft.TextField(
-        label="Description",
-        multiline=True,
-        min_lines=3,
-        width=400,
-    )
+    room_name_input = ft.TextField(label="Nom du salon", width=400, on_submit=room_description_input.focus)
 
     code_input = ft.TextField(
         label="Code d’invitation",

@@ -7,13 +7,7 @@ from chat.components import MyChatMessage, OtherChatMessage, SystemMessage
 from chat.models import Message
 from chat.api import fetch_room_messages, put_message, post_reaction, post_report, delete_message_bdd, post_message, post_quit_room
 from chat.dialogs import show_edit_dialog, show_delete_dialog, show_report_dialog, show_quit_dialog
-from utils import (
-    get_initials,
-    get_avatar_color,
-    get_colors,
-    show_top_toast,
-    format_date,
-)
+from utils import get_initials, get_avatar_color, get_colors, show_top_toast, format_date, copy_message
 import asyncio
 
 # import base64
@@ -125,7 +119,6 @@ async def ChatView(page: ft.Page):
                     icon_size=16,
                     on_click=lambda e: e.page.run_task(cancel_reply, e),
                 ),
-                # Sera awaité plus tard
             ],
         ),
     )
@@ -138,10 +131,12 @@ async def ChatView(page: ft.Page):
         capitalization=ft.TextCapitalization.SENTENCES,
         autofocus=False,
         expand=True,
+        multiline=True,
         min_lines=1,
+        max_lines=5,
         border_radius=20,
-        shift_enter=True,
-        on_submit=lambda e: send_click(e),  # Sera awaité via le framework Flet
+        # shift_enter=True,
+        # on_submit=lambda e: send_click(e),  # Sera awaité via le framework Flet
     )
 
     async def go_to_rooms(e):
@@ -163,11 +158,6 @@ async def ChatView(page: ft.Page):
         reply_banner.content.controls[0].controls[1].value = f"{msg.pseudo}: {msg.content[:30]}..."
         await new_message.focus()
         page.update()
-
-    async def copy_message(e, msg: Message):
-        await ft.Clipboard().set(msg.content)
-        page.pop_dialog()
-        await show_top_toast(page, "Message copié.")
 
     async def edit_message(e, msg: Message):
         page.pop_dialog()
@@ -386,10 +376,7 @@ async def ChatView(page: ft.Page):
 
     app_bar = ft.AppBar(
         # --- BOUTON RETOUR ---
-        leading=ft.IconButton(
-            icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED,
-            on_click=lambda _: page.views.pop(), 
-        ),
+        leading=ft.IconButton(icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, on_click=lambda _: page.run_task(page.push_route, "/rooms")),
         leading_width=40,
         # --- TITRE CLIQUABLE (Pour les infos du salon) ---
         title=ft.GestureDetector(

@@ -33,6 +33,8 @@ async def LoginView(page: ft.Page):
         user_info = await decode_token(token)
 
         # Stockage des infos utiles via SharedPreferences
+        if "sub" in user_info:
+            await storage.set("user_id", user_info["sub"])
         if "pseudo" in user_info:
             await storage.set("user_pseudo", user_info["pseudo"])
         if "role" in user_info:

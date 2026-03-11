@@ -1,5 +1,5 @@
 import flet as ft
-from utils import api, show_top_toast, get_avatar_color, COLORS_LOOKUP, get_initials
+from utils import api, show_top_toast, get_avatar_color, COLORS_LOOKUP, get_initials, copy_message, refresh_rooms
 import httpx
 import json
 
@@ -7,7 +7,7 @@ import json
 async def RoomInfoView(page: ft.Page):
     storage = ft.SharedPreferences()
     room_id = page.session.store.get("current_room_id")
-    current_user_id = page.session.store.get("user_id")  # Assure-toi de stocker ça au login
+    current_user_id = await storage.get("user_id")  # Assure-toi de stocker ça au login
 
     if not room_id:
         await page.push_route("/rooms")
@@ -18,15 +18,15 @@ async def RoomInfoView(page: ft.Page):
 
     # Avant le return, définissez l'icône d'en-tête
     room_icon_display = ft.Icon(icon=ft.Icons.GROUPS, size=40, color=ft.Colors.ON_PRIMARY_CONTAINER)
-    room_name_display = ft.Text("", size=24, weight="bold")
+    room_name_display = ft.Text("Chargement...", size=24, weight="bold")
     room_code_display = ft.Text("Public", size=12, color=ft.Colors.OUTLINE)
 
     is_admin = False
 
     # Champs éditables
-    name_field = ft.TextField(label="Nom du salon", read_only=True, border=ft.InputBorder.UNDERLINE)
-    desc_field = ft.TextField(label="Description", read_only=True, multiline=True, border=ft.InputBorder.UNDERLINE)
-    code_field = ft.TextField(label="Code d'invitation", value="Salon public", read_only=True, border=ft.InputBorder.UNDERLINE)
+    name_field = ft.TextField(label="Nom du salon", value="Chargement...", read_only=True, border=ft.InputBorder.UNDERLINE)
+    desc_field = ft.TextField(label="Description", value="Chargement...", read_only=True, multiline=True, border=ft.InputBorder.UNDERLINE)
+    code_field = ft.TextField(label="Code d'invitation", value="Chargement...", read_only=True, border=ft.InputBorder.UNDERLINE)
 
     # Bouton de sauvegarde (Caché par défaut)
     save_btn = ft.ElevatedButton("Enregistrer les modifications", icon=ft.Icons.SAVE, visible=False)
@@ -40,6 +40,7 @@ async def RoomInfoView(page: ft.Page):
             if cached_rooms_str:
                 rooms = json.loads(cached_rooms_str)
 
+            room_data = {}
             for r in rooms:
                 if r["id"] == room_id:
                     room_data = r
@@ -47,7 +48,7 @@ async def RoomInfoView(page: ft.Page):
 
             if not room_data:
                 await show_top_toast(page, "Salon introuvable", True)
-                await page.views.pop()
+                await page.push_route("/chat")
                 return
 
             room_data = r
@@ -58,13 +59,16 @@ async def RoomInfoView(page: ft.Page):
 
             # Vérification Admin
             if room_data["creator"]:
-                is_admin = room_data["creator"]["id"] == current_user_id
+                is_admin = str(room_data["creator"]["id"]) == str(current_user_id)
 
             # Remplissage de l'UI
             name_field.value = room_data["name"]
             desc_field.value = room_data["description"]
             if room_data["access_key"]:
                 code_field.value = room_data["access_key"]
+                code_field.on_click = lambda e: page.run_task(copy_message, e, page, room_data["access_key"], "Clé d'accès copiée !")
+            else:
+                code_field.value = "Salon Public"
 
             if is_admin:
                 name_field.read_only = False
@@ -94,13 +98,15 @@ async def RoomInfoView(page: ft.Page):
                 "description": desc_field.value,
             }
             # Appel API selon ton main.py: PUT /rooms/{room_id}?user_id={id}
-            response = await api.put(f"/rooms/{room_id}?user_id={current_user_id}", data=payload)
+            response = await api.put(f"/rooms/{room_id}", data=payload)
 
             if response.status_code == 200:
                 await show_top_toast(page, "Modifications enregistrées !")
                 page.session.store.set("current_room_name", name_field.value)
+                await refresh_rooms(page, storage)
+                page.run_task(load_room_info)
             else:
-                await show_top_toast(page, "Erreur lors de la modification", True)
+                await show_top_toast(page, response.json().get("detail", "Erreur lors de la modification"), True)
         except Exception as ex:
             await show_top_toast(page, "Erreur réseau", True)
 
@@ -112,7 +118,7 @@ async def RoomInfoView(page: ft.Page):
     return ft.View(
         route=f"/room_info/{room_id}",
         appbar=ft.AppBar(
-            leading=ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, on_click=lambda _: page.views.pop()),
+            leading=ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, on_click=lambda _: page.run_task(page.push_route, "/chat")),
             title=ft.Text("Détails du salon", weight="bold"),
             bgcolor="surface",
             center_title=True,

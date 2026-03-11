@@ -60,10 +60,7 @@ async def RoomsView(page: ft.Page):
                 )
                 room_list.controls.append(new_room_obj.controls)
 
-            # await asyncio.sleep(2)
-            # On supprime le sleep(2) qui simulait une attente
-            room_list.update()
-            info_text.update()
+            page.update()
 
         except httpx.RequestError:
             await show_top_toast(page, "Erreur réseau !", True)

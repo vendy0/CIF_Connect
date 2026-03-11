@@ -151,6 +151,33 @@ async def show_top_toast(page: ft.Page, message: str, is_error: bool = False):
     page.update()
 
 
+async def copy_message(e, page, content, success_message="Copié"):
+    await ft.Clipboard().set(content)
+    page.pop_dialog()
+    await show_top_toast(page, success_message)
+
+
+async def refresh_rooms(page, storage):
+    try:
+        response = await api.get("/user/rooms")
+
+        if response.status_code == 401:
+            await storage.remove("cif_token")
+            await page.push_route("/login")
+            return
+
+        data = response.json()
+
+        # Dans rooms_view.py, juste après "rooms = response.json()"
+        await storage.set("rooms_cache", json.dumps(data))
+        storage.update()
+
+        page.update()
+
+    except httpx.RequestError:
+        await show_top_toast(page, "Erreur réseau !", True)
+
+
 def format_date(date_to_format: datetime):
     day = date_to_format.strftime("%d")
 

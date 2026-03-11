@@ -134,8 +134,8 @@ def create_room(
 def update_room_info(
     room_id: int,
     update_data: RoomUpdateSchema,
-    user_id: int,  # On demande l'ID de l'user (idéalement via token, ici via query pour la démo)
-    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Modifier un salon (Nom, description, icône).

@@ -3,7 +3,7 @@ from chat.api import put_message, post_report, delete_message_bdd, post_quit_roo
 
 
 async def show_edit_dialog(page, msg, on_success):
-    edit_input = ft.TextField(value=msg.content, multiline=True, expand=True)
+    edit_input = ft.TextField(value=msg.content, multiline=True, expand=True, autofocus=True)
 
     async def save_click(e):
         if msg.content == edit_input.value.strip():
@@ -43,7 +43,7 @@ async def show_delete_dialog(page, msg_id, on_success):
 
 
 async def show_report_dialog(page, msg_id):
-    reason_input = ft.TextField(label="Raison du signalement", hint_text="Expliquez pourquoi...")
+    reason_input = ft.TextField(label="Raison du signalement", hint_text="Expliquez pourquoi...", autofocus=True)
 
     async def send_report(e):
         if not reason_input.value.strip():
