@@ -47,7 +47,7 @@ async def ChatView(page: ft.Page):
 			),
 			alignment=ft.Alignment.CENTER,
 			expand=True,
-			padding=ft.padding.only(top=200)
+			padding=ft.padding.only(top=200),
 		)
 
 	current_room_id = page.session.store.get("current_room_id") or 1
@@ -257,38 +257,16 @@ async def ChatView(page: ft.Page):
 		)
 		# await refresh_ui()
 
-	def on_message(message: Message):
+	def on_message(message: Message, is_me):
 		# if message.parent_author == current_pseudo:
 		# 	print("VIBRATION")
 		if message.message_type in ["join", "quit"]:
 			chat_list.controls.append(SystemMessage(message))
 		elif message.message_type == "chat":
-			if message.pseudo != current_pseudo:
-				chat_list.controls.append(
-					OtherChatMessage(
-						message=message,
-						page=page,
-						on_copy=copy_message,
-						on_reply=prepare_reply,
-						on_edit=edit_message,
-						on_report=report_message,
-						on_react=react_to_message,
-						on_delete=delete_message,
-					)
-				)
+			if is_me:
+				chat_list.controls.append(MyChatMessage(message=message, page=page, on_copy=copy_message, on_reply=prepare_reply, on_edit=edit_message, on_report=report_message, on_react=react_to_message, on_delete=delete_message))
 			else:
-				chat_list.controls.append(
-					MyChatMessage(
-						message=message,
-						page=page,
-						on_copy=copy_message,
-						on_reply=prepare_reply,
-						on_edit=edit_message,
-						on_report=report_message,
-						on_react=react_to_message,
-						on_delete=delete_message,
-					)
-				)
+				chat_list.controls.append(OtherChatMessage(message=message, page=page, on_copy=copy_message, on_reply=prepare_reply, on_edit=edit_message, on_report=report_message, on_react=react_to_message, on_delete=delete_message))
 		page.update()
 
 	async def show_messages(messages_received, first_load=False):
@@ -355,7 +333,8 @@ async def ChatView(page: ft.Page):
 
 					chat_list.controls.append(date_divider)
 					last_date = message_date
-				on_message(me)
+				is_me = me.pseudo == current_pseudo
+				on_message(me, is_me)
 			page.update()
 			# await chat_list.scroll_to(offset=-1, duration=100)
 			# On affiche le message

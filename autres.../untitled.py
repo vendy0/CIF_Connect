@@ -14,8 +14,13 @@
 # - Comment je conditionne ce unread messages
 # - Quitter le Salon général
 # - Afficher les salons à partir du dernier message reçu
-# - Les notifs
+# - Les notifs (Quand on se fait tag aussi)
 # - Mettre à jour la page room_info pour changer le nombre de membres en ligne
+# - Désactiver l'auto scroll quand on remonte
+# - Ajouter la colonne last read dans la bdd
+
+
+
 
 # - Mettre les options de message dans le swipe
 
