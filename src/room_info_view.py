@@ -56,6 +56,42 @@ async def RoomInfoView(page: ft.Page):
 	# Bouton de sauvegarde (Caché par défaut)
 	save_btn = ft.ElevatedButton("Enregistrer les modifications", icon=ft.Icons.SAVE, visible=False)
 
+	# À définir avant le return du ft.View
+	delete_btn = ft.TextButton(
+		"Supprimer le salon",
+		icon=ft.Icons.DELETE_FOREVER,
+		style=ft.ButtonStyle(color=ft.Colors.ERROR),
+		visible=False,  # Caché par défaut
+		on_click=lambda e: open_delete_dialog(),
+	)
+
+	async def handle_delete_room(e):
+		try:
+			# On ferme le dialogue d'abord
+
+			response = await api.delete(endpoint=f"/rooms/{room_id}")
+
+			if response.status_code == 204:
+				page.pop_dialog()
+				await page.push_route("/rooms")
+				await show_top_toast(page, "Salon supprimé avec succès")
+				await refresh_rooms(page, storage)
+			else:
+				error_msg = response.json().get("detail", "Erreur lors de la suppression")
+				await show_top_toast(page, error_msg, True)
+		except httpx.RequestError:
+			await show_top_toast(page, "Erreur réseau", True)
+			page.update()
+
+	def open_delete_dialog():
+		confirm_dialog = ft.AlertDialog(
+			title=ft.Text("Supprimer le salon ?"),
+			content=ft.Text("Cette action est irréversible. Tous les messages seront perdus."),
+			actions=[ft.TextButton("Annuler", on_click=page.pop_dialog), ft.FilledButton("Supprimer", bgcolor=ft.Colors.ERROR, color=ft.Colors.ON_ERROR, on_click=handle_delete_room)],
+		)
+		page.show_dialog(confirm_dialog)
+		page.update()
+
 	members_list = ft.ListView(spacing=5, padding=10, height=300)
 
 	async def load_room_info():
@@ -106,6 +142,7 @@ async def RoomInfoView(page: ft.Page):
 				btn_refresh.on_click = handle_refresh_code
 				btn_copy.visible = True
 				btn_copy.on_click = lambda e: page.run_task(copy_message, e, page, code_field.value, "Code copié !")
+				delete_btn.visible = True
 				# room_name_display.spans = [ft.TextSpan(" (Cliquer sur l'icône pour changer)", style=ft.TextStyle(size=10, color=ft.Colors.OUTLINE))]
 			# Simulation d'affichage des membres (À relier à une route API qui liste les membres de la room)
 			members = [{"pseudo": "RapideRenard5"}, {"pseudo": "CalmeHibou42"}]  # Exemple
@@ -227,7 +264,13 @@ async def RoomInfoView(page: ft.Page):
 								]
 							),
 							padding=ft.padding.symmetric(horizontal=20),
+						),  # ... dans le Column principal
+						ft.Container(
+							content=delete_btn,
+							alignment=ft.Alignment.CENTER,
+							margin=ft.margin.only(top=30, bottom=20),
 						),
+						# ...
 					],
 					scroll=ft.ScrollMode.AUTO,
 				),

@@ -4,10 +4,6 @@ from utils import Room, api, show_top_toast
 import json
 
 
-host = "127.0.0.1"
-port = "8000"
-
-
 async def RoomsView(page: ft.Page):
     # 1. On récupère le badge de sécurité (le token)
     storage = ft.SharedPreferences()

@@ -22,6 +22,7 @@
 # - Comment je conditionne ce unread messages
 # - Quitter le Salon général
 # Afficher les salons à partir du dernier message reçu
+# - Ajouter d'autres icones
 
 Maintenant je veux :
 Analyse attentivement ma chat_view
@@ -50,6 +51,27 @@ Analyse attentivement ma chat_view
 # - Puis un bouton à gauche de l'app bar pour retourner à la rooms_view
 
 """
+# // "ON_PRIMARY",
+# // // "ON_PRIMARY_CONTAINER",
+# // "ON_PRIMARY_FIXED",
+# // "ON_PRIMARY_FIXED_VARIANT",
+# // "ON_SECONDARY",
+# // "ON_SECONDARY_CONTAINER",
+# // "ON_SECONDARY_FIXED",
+# // "ON_SECONDARY_FIXED_VARIANT",
+# // "ON_SURFACE",
+# // "ON_SURFACE_VARIANT",
+# // "ON_TERTIARY",
+# // "ON_TERTIARY_CONTAINER",
+# // "ON_TERTIARY_FIXED",
+# // "ON_TERTIARY_FIXED_VARIANT",
+
+
+# // "SURFACE",
+# // "SURFACE_BRIGHT",
+# // "SURFACE_CONTAINER",
+# // "SURFACE_CONTAINER_HIGH",
+# // "SURFACE_CONTAINER_HIGHEST",
 # - Glisser pour répondre
 # - Fond d'écran
 # - Avant d'envoyer vers bdd, vérifier si il y a changement

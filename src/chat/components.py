@@ -3,6 +3,10 @@ from chat.models import Message
 from utils import get_avatar_color, get_initials, COLORS_LOOKUP
 from datetime import datetime, timedelta
 
+# =============================================================================
+# 2. COMPOSANTS VISUELS DES MESSAGES
+# =============================================================================
+
 
 class SystemMessage(ft.Row):
     def __init__(self, message: Message):

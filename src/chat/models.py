@@ -2,6 +2,9 @@ from dataclasses import dataclass, field
 from typing import Optional, List
 from datetime import datetime, date, time
 
+# =============================================================================
+# 1. MODÈLES DE DONNÉES
+# =============================================================================
 
 @dataclass
 class Message:
