@@ -1,6 +1,7 @@
 import flet as ft
 import httpx
-from utils import Room
+from utils import Room, api, show_top_toast
+import asyncio
 
 
 host = "127.0.0.1"
@@ -10,31 +11,32 @@ port = "8000"
 async def RoomsView(page: ft.Page):
     # 1. On récupère le badge de sécurité (le token)
     sp = ft.SharedPreferences()
-    token = await sp.get("cif_token")
-    if not token:
-        await page.push_route("/login")
 
-    # 2. On prépare l'enveloppe (le header)
-    headers = {"Authorization": f"Bearer {token}"}
+    # # Dans rooms_view.py, avant le try/except :
+    # loading_ring = ft.ProgressRing()
+    # page.overlay.append(ft.Container(content=loading_ring, alignment=ft.Alignment.CENTER, expand=True, bgcolor=ft.Colors.with_opacity(0.3, ft.Colors.PRIMARY)))
+    # page.update()
 
-    # 3. On demande la liste fraîche au serveur
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"http://{host}:{port}/user/rooms", headers=headers)
+    # # rooms = []
 
-            # Si le jeton est expiré ou invalide (401)
-            if response.status_code == 401:
-                await page.push_route("/login")  # On redirige
-                await sp.remove("cif_token")  # On nettoie
-                print("Erreur lors de la récupération des rooms !")
-                return
+    # # 3. On demande la liste fraîche au serveur
+    # try:
+    #     response = await api.get(f"/user/rooms")
 
-            rooms = response.json()
-    except Exception as e:
-        # En cas de problème réseau par exemple
-        print(f"Erreur de connexion : {e}")
-        await page.push_route("/login")
-        return
+    #     # Si le jeton est expiré ou invalide (401)
+    #     if response.status_code == 401:
+    #         await page.push_route("/login")  # On redirige
+    #         await sp.remove("cif_token")  # On nettoie
+    #         print("Erreur lors de la récupération des rooms !")
+    #         return
+
+    #     rooms = response.json()
+    #     await asyncio.sleep(5)
+    #     page.overlay.clear()
+    #     page.update()
+    # except httpx.RequestError as ex:
+    #     await show_top_toast(page, "Erreur réseau !", True)
+    #     return
 
     # 	# Simulation de données (à remplacer par la BDD plus tard)
     async def go_to_new_room(e):
@@ -48,24 +50,104 @@ async def RoomsView(page: ft.Page):
 
     room_list = ft.ListView(expand=True, spacing=10, padding=10)
 
-    for r in rooms:
-        # Création de l'objet Room à partir du dictionnaire 'r'
-        new_room_obj = Room(page=page, room_id=r["id"], name=r["name"], description=r["description"], icon=r["icon"])
-        # Ajout du composant visuel à la ListView
-        room_list.controls.append(new_room_obj.controls)
+    # for r in rooms:
+    #     # Création de l'objet Room à partir du dictionnaire 'r'
+    #     new_room_obj = Room(page=page, room_id=r["id"], name=r["name"], description=r["description"], icon=r["icon"])
+    #     # Ajout du composant visuel à la ListView
+    #     room_list.controls.append(new_room_obj.controls)
 
-    if not rooms:
-        info_text = ft.Text(
-            "Aucun salon disponible pour le moment",
-            size=12,
-            color=ft.Colors.GREY_500,
-        )
-    else:
-        info_text = ft.Text(
-            "Sélectionnez un espace de discussion",
-            size=12,
-            color=ft.Colors.GREY_500,
-        )
+    info_text = ft.Text("Chargement des salons...", size=14, color=ft.Colors.GREY_500)
+
+    # async def load_rooms():
+    #     nonlocal info_text
+    #     loading_ring = ft.ProgressRing()
+    #     loader = ft.Container(
+    #         content=loading_ring,
+    #         alignment=ft.Alignment.CENTER,
+    #         expand=True,
+    #         bgcolor=ft.Colors.TRANSPARENT,
+    #     )
+
+    #     page.overlay.append(loader)
+    #     page.update()
+
+    #     try:
+    #         response = await api.get("/user/rooms")
+
+    #         if response.status_code == 401:
+    #             await sp.remove("cif_token")
+    #             await page.push_route("/login")
+    #             return
+
+    #         data = response.json()
+
+    #         if not data:
+    #             info_text.value = "Aucun salon disponible pour le moment"
+    #         else:
+    #             info_text.value = "Sélectionnez un espace de discussion"
+
+    #         room_list.controls.clear()
+
+    #         for r in data:
+    #             new_room_obj = Room(
+    #                 page=page,
+    #                 room_id=r["id"],
+    #                 name=r["name"],
+    #                 description=r["description"],
+    #                 icon=r["icon"],
+    #             )
+    #             room_list.controls.append(new_room_obj.controls)
+
+    #         await asyncio.sleep(2)
+    #         room_list.update()
+    #         loader.visible = False
+    #         loader.update()
+
+    #     except httpx.RequestError:
+    #         await show_top_toast(page, "Erreur réseau !", True)
+    #         loader.visible = False
+    # loader.update()
+
+    async def load_rooms():
+        nonlocal info_text
+        # On supprime toute la partie 'loader' et 'page.overlay' ici
+
+        try:
+            response = await api.get("/user/rooms")
+
+            if response.status_code == 401:
+                await sp.remove("cif_token")
+                await page.push_route("/login")
+                return
+
+            data = response.json()
+
+            if not data:
+                info_text.value = "Aucun salon disponible pour le moment"
+            else:
+                info_text.value = "Sélectionnez un espace de discussion"
+
+            room_list.controls.clear()
+
+            for r in data:
+                new_room_obj = Room(
+                    page=page,
+                    room_id=r["id"],
+                    name=r["name"],
+                    description=r["description"],
+                    icon=r["icon"],
+                )
+                room_list.controls.append(new_room_obj.controls)
+            
+            # await asyncio.sleep(2)
+            # On supprime le sleep(2) qui simulait une attente
+            room_list.update()
+            info_text.update()
+
+        except httpx.RequestError:
+            await show_top_toast(page, "Erreur réseau !", True)
+
+    page.run_task(load_rooms)
 
     return ft.View(
         route="/rooms",
@@ -82,8 +164,5 @@ async def RoomsView(page: ft.Page):
             tooltip="Créer ou rejoindre",
             on_click=go_to_new_room,
         ),
-        controls=[
-            info_text,
-            room_list
-        ],
+        controls=[info_text, room_list],
     )

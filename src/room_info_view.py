@@ -95,43 +95,107 @@ async def RoomInfoView(page: ft.Page):
     # Déclenchement du chargement
     page.run_task(load_room_info)
 
+    # return ft.View(
+    #     route=f"/room_info/{room_id}",
+    #     appbar=ft.AppBar(
+    #         leading=ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, on_click=lambda _: page.run_task(page.push_route, "/chat")),
+    #         title=ft.Text("Infos du salon"),
+    #         bgcolor="surface",
+    #     ),
+    #     controls=[
+    #         ft.Container(
+    #             content=ft.Column(
+    #                 controls=[
+    #                         ft.Row([
+    #                         ft.CircleAvatar(content=ft.Icons.CHAT_BUBBLE, radius=40, bgcolor=ft.Colors.PRIMARY_CONTAINER, color=ft.Colors.ON_PRIMARY_CONTAINER)
+    #                     ], alignment=ft.MainAxisAlignment.CENTER),
+    #                     ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
+                        
+    #                     # leading=ft.Icon(icon=self.icon, color=ft.Colors.BLUE_600),
+
+    #                     # Formulaire
+    #                     name_field,
+    #                     desc_field,
+    #                     code_field,
+                        
+    #                     ft.Container(content=save_btn, alignment=ft.Alignment.CENTER, margin=ft.margin.only(top=10, bottom=20)),
+                        
+    #                     # Section Membres
+    #                     ft.Text(f"Membres", size=18, weight="bold", color=ft.Colors.PRIMARY),
+    #                     ft.Text("30 en ligne / 126", size=12, color=ft.Colors.GREEN), # À rendre dynamique via WebSockets
+    #                     ft.Container(
+    #                         content=members_list,
+    #                         border=ft.border.all(1, ft.Colors.OUTLINE_VARIANT),
+    #                         border_radius=10,
+    #                     )
+    #                 ],
+    #                 scroll=ft.ScrollMode.AUTO,
+    #             ),
+    #             padding=20,
+    #             expand=True
+    #         )
+    #     ]
+    # )
+    
+# Dans room_info_view.py
+# Remplacer la construction de la vue (return ft.View(...)) par :
+
     return ft.View(
         route=f"/room_info/{room_id}",
         appbar=ft.AppBar(
             leading=ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, on_click=lambda _: page.run_task(page.push_route, "/chat")),
-            title=ft.Text("Infos du salon"),
+            title=ft.Text("Détails du salon", weight="bold"),
             bgcolor="surface",
+            center_title=True,
         ),
         controls=[
             ft.Container(
                 content=ft.Column(
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     controls=[
-                        # En-tête avec Icône
-                        ft.Row([
-                            ft.CircleAvatar(content=ft.Icons.CHAT_BUBBLE, radius=40, bgcolor=ft.Colors.PRIMARY_CONTAINER, color=ft.Colors.ON_PRIMARY_CONTAINER)
-                        ], alignment=ft.MainAxisAlignment.CENTER),
-                        ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
+                        # En-tête avec Avatar et Nom
+                        ft.Container(height=20),
+                        ft.CircleAvatar(
+                            radius=50,
+                            content=ft.Icon(icon=room_data.get("icon", ft.Icons.CHAT_BUBBLE), size=40, color=ft.Colors.ON_PRIMARY_CONTAINER),
+                            bgcolor=ft.Colors.PRIMARY_CONTAINER
+                        ),
+                        ft.Text(room_data.get("name", "Chargement..."), size=24, weight="bold"),
+                        ft.Text(f"Code : {room_data.get('access_key', 'Public')}", size=12, color=ft.Colors.OUTLINE),
+                        ft.Divider(height=30, color=ft.Colors.TRANSPARENT),
                         
-                        # Formulaire
-                        name_field,
-                        desc_field,
-                        code_field,
-                        
-                        ft.Container(content=save_btn, alignment=ft.Alignment.CENTER, margin=ft.margin.only(top=10, bottom=20)),
+                        # Formulaire (dans un Container pour limiter la largeur sur PC/Tablette)
+                        ft.Container(
+                            content=ft.Column([
+                                name_field,
+                                desc_field,
+                                code_field,
+                                ft.Container(content=save_btn, alignment=ft.Alignment.CENTER, margin=ft.margin.only(top=15, bottom=15)),
+                            ]),
+                            padding=ft.padding.symmetric(horizontal=20)
+                        ),
                         
                         # Section Membres
-                        ft.Text(f"Membres", size=18, weight="bold", color=ft.Colors.PRIMARY),
-                        ft.Text("30 en ligne / 126", size=12, color=ft.Colors.GREEN), # À rendre dynamique via WebSockets
                         ft.Container(
-                            content=members_list,
-                            border=ft.border.all(1, ft.Colors.OUTLINE_VARIANT),
-                            border_radius=10,
+                            content=ft.Column([
+                                ft.Row([
+                                    ft.Text("Membres", size=18, weight="bold"),
+                                    ft.Text("En ligne", size=12, color=ft.Colors.GREEN_500),
+                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                                ft.Container(
+                                    content=members_list,
+                                    bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
+                                    border_radius=15,
+                                    padding=5
+                                )
+                            ]),
+                            padding=ft.padding.symmetric(horizontal=20)
                         )
                     ],
                     scroll=ft.ScrollMode.AUTO,
                 ),
-                padding=20,
                 expand=True
             )
         ]
     )
+    

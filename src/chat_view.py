@@ -746,16 +746,14 @@ async def ChatView(page: ft.Page):
                         on_delete=delete_message,
                     )
                 )
-        page.update()
 
     async def show_messages(messages_received, first_load=False):
+        nonlocal chat_list
         last_date = None
         # On affiche les messages
         if messages_received:
-            if type(messages_received) == dict:
-                messages_received_list = [None]
-                messages_received_list[0] = messages_received
-                messages_received = messages_received_list
+            if isinstance(messages_received, dict):
+                messages_received = [messages_received]
 
             for message_to_show in messages_received:
                 # On cherche s'il y a parent et le message et l'author du parent
@@ -765,7 +763,7 @@ async def ChatView(page: ft.Page):
 
                 if parent_id:
                     for m in messages_received:
-                        if not m["id"] == parent_id:
+                        if m["id"] != parent_id:
                             continue
                         parent_content = m["content"]
                         parent_author = m["author_display_name"]
@@ -773,7 +771,7 @@ async def ChatView(page: ft.Page):
                     if not parent_content:
                         parent_content = "Message supprimé !"
                     if not parent_author:
-                        parent_content = "Autheur supprimé !"
+                        parent_author = "Autheur supprimé !"
 
                 message_datetime = datetime.strptime(message_to_show["created_at"], "%Y-%m-%dT%H:%M:%S")
                 message_date = message_datetime.date()
@@ -809,21 +807,22 @@ async def ChatView(page: ft.Page):
                     )
                     chat_list.controls.append(date_divider)
                     last_date = message_date
-                # On affiche le message
                 on_message(me)
+            chat_list.update()
+            await asyncio.slepp(0.05)
+            await chat_list.scroll_to(offset=-1, duration=100)
+            # On affiche le message
             # await asyncio.sleep(0.1)
-            if first_load:
-                last_read = await storage.get(f"last_read_{current_room_id}")
-                if last_read:
-                    # Flet permet de scroller vers une "key" spécifique
-                    # await chat_list.scroll_to(key=str(last_read), duration=300)
-                    pass
-                else:
-                    pass
+            # if first_load:
+            #     last_read = await storage.get(f"last_read_{current_room_id}")
+            #     if last_read:
+            #         # Flet permet de scroller vers une "key" spécifique
+            #         # await chat_list.scroll_to(key=str(last_read), duration=300)
+            #         pass
+            #     else:
+            #         pass
                     # Sinon, on va tout en bas
                     # await chat_list.scroll_to(offset=-1, duration=100)
-
-    page.run_task(show_messages, messages_received, True)
 
     page.pubsub.subscribe(on_message)
 
@@ -940,6 +939,10 @@ async def ChatView(page: ft.Page):
     #         ),
     #     ],
     # )
+    async def load_messages(messages):
+        await show_messages(messages, True)
+
+    page.run_task(load_messages, messages_received)
 
     return ft.View(
         route="/chat",
