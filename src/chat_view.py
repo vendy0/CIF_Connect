@@ -3,15 +3,15 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 from datetime import datetime, date, time, timedelta
 import httpx
+from chat.components import MyChatMessage, OtherChatMessage, SystemMessage
+from chat.models import Message
+from chat.api import fetch_room_messages, put_message, post_reaction, post_report, delete_message_bdd, post_message, post_quit_room
 from utils import (
     get_initials,
     get_avatar_color,
     get_colors,
-    host,
-    port,
     show_top_toast,
     format_date,
-    api,
 )
 import asyncio
 
@@ -24,352 +24,11 @@ import threading
 # =============================================================================
 
 
-@dataclass
-class Message:
-    id: int
-    pseudo: str
-    content: str
-    message_type: str
-    modified: bool
-    message_datetime: datetime
-    message_date: date
-    message_time: time
-    parent_id: Optional[int] = None
-    parent_content: Optional[str] = None
-    parent_author: Optional[str] = None
-    reactions: dict = field(default_factory=dict)
-
-
 COLORS_LOOKUP = get_colors()
 
 # =============================================================================
 # 2. COMPOSANTS VISUELS DES MESSAGES
 # =============================================================================
-
-
-class SystemMessage(ft.Row):
-    def __init__(self, message: Message):
-        super().__init__()
-        self.alignment = ft.MainAxisAlignment.CENTER
-
-        color = ft.Colors.GREEN_600 if message.message_type == "join" else ft.Colors.ERROR
-        icon = ft.Icons.LOGIN_ROUNDED if message.message_type == "join" else ft.Icons.LOGOUT_ROUNDED
-
-        self.controls = [
-            ft.Container(
-                content=ft.Row(
-                    [
-                        ft.Icon(icon, size=14, color=color),
-                        ft.Text(
-                            message.content,
-                            italic=True,
-                            size=12,
-                            color=ft.Colors.ON_SURFACE_VARIANT,
-                        ),
-                    ],
-                    tight=True,
-                    spacing=5,
-                ),
-                bgcolor="surfacecontainerhighest",  # Syntaxe sécurisée
-                padding=ft.padding.symmetric(horizontal=12, vertical=6),
-                border_radius=15,
-            )
-        ]
-
-
-class BaseChatMessage(ft.Row):
-    def __init__(
-        self,
-        message: Message,
-        page: ft.Page,
-        on_copy,
-        on_reply,
-        on_edit,
-        on_report,
-        on_react,
-        on_delete,
-    ):
-        super().__init__()
-        self.message = message
-        self._page_ref = page
-        self.on_copy = on_copy
-        self.on_reply = on_reply
-        self.on_edit = on_edit
-        self.on_react = on_react
-        self.on_report = on_report
-        self.on_delete = on_delete
-        self.vertical_alignment = ft.CrossAxisAlignment.START
-        self.parent_bubble = ft.Container()
-
-        # 1. Message Parent (Reply) - Full Width (Style WhatsApp)
-        if self.message.parent_content and self.message.parent_author:
-            self.parent_bubble = ft.Container(
-                content=ft.Column(
-                    [
-                        ft.Text(
-                            self.message.parent_author,
-                            size=11,
-                            weight="bold",
-                            color=ft.Colors.PRIMARY,
-                        ),
-                        ft.Text(
-                            self.message.parent_content,
-                            size=12,
-                            max_lines=1,
-                            overflow=ft.TextOverflow.ELLIPSIS,
-                            italic=True,
-                        ),
-                    ],
-                    spacing=1,
-                ),
-                padding=ft.padding.all(8),
-                # Marge en bas pour espacer du vrai message
-                margin=ft.margin.only(bottom=5),
-                bgcolor=ft.Colors.with_opacity(0.1, ft.Colors.ON_SURFACE_VARIANT),
-                border=ft.border.only(left=ft.BorderSide(4, ft.Colors.PRIMARY)),
-                border_radius=5,
-            )
-
-    def get_reactions_row(self):
-        reactions_row = ft.Row(spacing=4, tight=True)
-        if self.message.reactions:
-            for emoji, count in self.message.reactions.items():
-                reactions_row.controls.append(
-                    ft.Container(
-                        content=ft.Text(f"{emoji} {count}", size=11),
-                        bgcolor=ft.Colors.SURFACE_CONTAINER_HIGH,
-                        border_radius=10,
-                        padding=ft.padding.symmetric(horizontal=6, vertical=2),
-                        border=ft.border.all(1, ft.Colors.OUTLINE_VARIANT),
-                    )
-                )
-        return reactions_row
-
-    # Méthodes d'actions communes
-    async def action_reply(self, e):
-        # self._page_ref.show_dialog(self._page_ref.bottom_sheet)
-        # self._page_ref.bottom_sheet.open = False
-        self._page_ref.pop_dialog()
-        self._page_ref.update()
-        await self.on_reply(self.message)
-
-    def action_react(self, e):
-        self._page_ref.show_dialog(self._page_ref.bottom_sheet)
-        self._page_ref.update()
-        self.on_react(e, self.message)
-
-    async def pass_func(self, e):
-        pass
-
-
-class MyChatMessage(BaseChatMessage):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.alignment = ft.MainAxisAlignment.END  # Aligné à droite
-
-        # Menu spécifique : Copier, Modifier, Supprimer, Répondre
-        self.menu_items = [
-            ft.ListTile(
-                leading=ft.Icon(ft.Icons.CONTENT_COPY),
-                title=ft.Text("Copier"),
-                on_click=lambda e: self._page_ref.run_task(self.on_copy, e, self.message),
-            ),
-            ft.ListTile(
-                leading=ft.Icon(ft.Icons.EDIT),
-                title=ft.Text("Modifier"),
-                on_click=lambda e: self._page_ref.run_task(self.on_edit, e, self.message),
-            )
-            if (datetime.now() - timedelta(minutes=15)) < self.message.message_datetime
-            else ft.Container(),
-            ft.ListTile(
-                leading=ft.Icon(ft.Icons.DELETE_OUTLINE, color="error"),
-                title=ft.Text("Supprimer"),
-                on_click=lambda e: self._page_ref.run_task(self.on_delete, e, self.message),
-            )
-            if (datetime.now() - timedelta(days=3)) < self.message.message_datetime
-            else ft.Container(),
-            ft.ListTile(
-                leading=ft.Icon(ft.Icons.REPLY),
-                title=ft.Text("Répondre"),
-                on_click=self.action_reply,
-            ),
-        ]
-
-        bubble = ft.GestureDetector(
-            on_tap=lambda _: self.show_menu(),
-            content=ft.Container(
-                content=ft.Column(
-                    [
-                        self.parent_bubble,
-                        ft.Text(
-                            self.message.pseudo,
-                            size=12,
-                            weight="bold",
-                            color=get_avatar_color(self.message.pseudo, COLORS_LOOKUP),
-                        ),
-                        ft.Text(
-                            self.message.content,
-                            size=15,
-                            color=ft.Colors.ON_PRIMARY_CONTAINER,
-                        ),
-                        ft.Row(
-                            [
-                                ft.Text("Modifié • ", size=9, italic=True) if self.message.modified else ft.Container(),
-                                ft.Text(self.message.message_time.strftime("%H:%M"), size=10),
-                            ],
-                            alignment="end",
-                            spacing=1,
-                        ),
-                    ],
-                    tight=True,
-                    horizontal_alignment="stretch",
-                ),
-                bgcolor=ft.Colors.PRIMARY_CONTAINER,  # Couleur différente pour nos messages
-                padding=10,
-                border_radius=ft.border_radius.only(top_left=15, top_right=0, bottom_left=15, bottom_right=15),
-                width=200,
-                # on_click=lambda _: self.show_menu(),
-            ),
-        )
-
-        bulle_complet = ft.Row(
-            [
-                ft.Stack(
-                    [
-                        ft.Column(
-                            [bubble, ft.Container(height=10 if self.message.reactions else 0)],
-                            tight=True,
-                        ),
-                        ft.Container(content=self.get_reactions_row(), bottom=0, left=10),  # Réactions à gauche pour nos messages
-                    ],
-                ),
-                ft.CircleAvatar(
-                    content=ft.Text(get_initials(self.message.pseudo)),
-                    bgcolor=get_avatar_color(self.message.pseudo, COLORS_LOOKUP),
-                ),
-            ]
-        )
-
-        message_avec_swipe = ft.Dismissible(
-            key=str(self.message.id),  # Obligatoire pour un Dismissible
-            content=bulle_complet,
-            dismiss_thresholds={ft.DismissDirection.START_TO_END: 0.1},
-            dismiss_direction=ft.DismissDirection.START_TO_END,  # Glisser vers la droite
-            background=ft.Container(
-                bgcolor=ft.Colors.TRANSPARENT,
-                padding=10,
-                alignment=ft.Alignment.CENTER_LEFT,
-                content=ft.Icon(ft.Icons.REPLY_ROUNDED, color=ft.Colors.PRIMARY),
-            ),
-            # C'est ici qu'est la magie : on bloque la disparition de l'élément !
-            on_confirm_dismiss=self.handle_swipe_reply,
-        )
-
-        self.controls = [message_avec_swipe]
-
-    # Fonction à ajouter dans ta classe :
-    async def handle_swipe_reply(self, e: ft.DismissibleDismissEvent):
-        # On déclenche la réponse
-        await self.on_reply(self.message)
-        await e.control.confirm_dismiss(False)
-        # On renvoie False pour que le message revienne à sa place (il n'est pas supprimé)
-        return False
-
-    def show_menu(self):
-        self._page_ref.bottom_sheet = ft.BottomSheet(ft.Container(ft.Column(self.menu_items, tight=True), padding=10))
-        self._page_ref.show_dialog(self._page_ref.bottom_sheet)
-        self._page_ref.update()
-
-
-class OtherChatMessage(BaseChatMessage):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.alignment = ft.MainAxisAlignment.START
-
-        # Menu spécifique : Répondre, Réagir, Signaler
-        self.menu_items = [
-            ft.ListTile(
-                leading=ft.Icon(ft.Icons.CONTENT_COPY),
-                title=ft.Text("Copier"),
-                on_click=lambda e: self._page_ref.run_task(self.on_copy, e, self.message),
-            ),
-            ft.ListTile(
-                leading=ft.Icon(ft.Icons.REPLY),
-                title=ft.Text("Répondre"),
-                on_click=lambda e: self._page_ref.run_task(self.action_reply, e),
-            ),
-            ft.ListTile(
-                leading=ft.Icon(ft.Icons.FAVORITE_BORDER),
-                title=ft.Text("Réagir"),
-                on_click=self.action_react,
-            ),
-            ft.ListTile(
-                leading=ft.Icon(ft.Icons.REPORT, color="error"),
-                title=ft.Text("Signaler"),
-                on_click=lambda _: self.on_report(self.message),
-            ),
-        ]
-
-        # Construction UI (Bulle classique à gauche avec Avatar)
-        bubble = self.build_bubble(ft.Colors.SURFACE_CONTAINER_HIGHEST)
-
-        self.controls = [
-            ft.CircleAvatar(
-                content=ft.Text(get_initials(self.message.pseudo)),
-                bgcolor=get_avatar_color(self.message.pseudo, COLORS_LOOKUP),
-            ),
-            ft.Stack(
-                [
-                    self.parent_bubble,
-                    ft.Column(
-                        [bubble, ft.Container(height=10 if self.message.reactions else 0)],
-                        tight=True,
-                    ),
-                    ft.Container(content=self.get_reactions_row(), bottom=0, right=10),
-                ]
-            ),
-        ]
-
-    def build_bubble(self, color):
-        # Code de ta bulle actuelle (avec max_width=200)
-        return ft.GestureDetector(
-            on_tap=lambda _: self.show_menu(),
-            # on_long_press=lambda _: self.show_menu(),
-            content=ft.Container(
-                content=ft.Column(
-                    [
-                        self.parent_bubble,
-                        ft.Text(
-                            self.message.pseudo,
-                            size=12,
-                            weight="bold",
-                            color=get_avatar_color(self.message.pseudo, COLORS_LOOKUP),
-                        ),
-                        ft.Text(self.message.content, size=15),
-                        ft.Row(
-                            [
-                                ft.Text("Modifié •", size=9, italic=True) if self.message.modified else ft.Container(),
-                                ft.Text(self.message.message_time.strftime("%H:%M"), size=10),
-                            ],
-                            alignment="end",
-                            spacing=2,
-                        ),
-                    ],
-                    tight=True,
-                    horizontal_alignment="stretch",
-                ),
-                bgcolor=color,
-                padding=10,
-                border_radius=ft.border_radius.only(top_left=0, top_right=15, bottom_left=15, bottom_right=15),
-                width=200,
-                # on_click=lambda _: self.show_menu(),
-            ),
-        )
-
-    def show_menu(self):
-        self._page_ref.bottom_sheet = ft.BottomSheet(ft.Container(ft.Column(self.menu_items, tight=True), padding=10))
-        self._page_ref.show_dialog(self._page_ref.bottom_sheet)
-        self._page_ref.update()
 
 
 # =============================================================================
@@ -410,22 +69,26 @@ async def ChatView(page: ft.Page):
         bgcolor=ft.Colors.SURFACE,
     )
 
-    # 3. On demande la liste fraîche au serveur
-    try:
-        response = await api.get(f"/room/{current_room_id}/messages")
+    # On récupère les messages
+    messages_received = None
 
-        # Si le jeton est expiré ou invalide (401)
-        if response.status_code == 401:
-            await show_top_toast(page, "La session a expiré !", True)
-            await page.push_route("/login")  # On redirige
+    # 2. On définit la fonction de chargement
+    async def load_initial_data():
+        nonlocal messages_received
+        # Appel à ton nouveau fichier API
+        messages_received = await fetch_room_messages(page, current_room_id)
+
+        if messages_received is None:
+            # Si erreur (401 ou réseau), api.py a déjà fait le toast
+            # On redirige explicitement ici si ce n'est pas déjà fait
+            await page.push_route("/rooms")
             return
-        #
-        messages_received = response.json()
 
-    # VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
-    except httpx.RequestError as ex:
-        await show_top_toast(page, "Erreur réseau !", True)
-        return
+        # Si tout est OK, on affiche
+        await show_messages(messages_received, first_load=True)
+
+    # 3. On lance le chargement SANS bloquer l'affichage de la vue
+    page.run_task(load_initial_data)
 
     reply_banner = ft.Container(
         visible=False,
@@ -498,27 +161,7 @@ async def ChatView(page: ft.Page):
                 return
             msg.content = edit_message_input.value.strip()
 
-            try:
-                response = await api.put(f"/message/{msg.id}", data={"content": msg.content})
-                # Si le jeton est expiré ou invalide (401)
-                if response.status_code not in [200, 201]:
-                    edit_message_input.error = response.json().get("detail", "Erreur inconnue")
-                    await show_top_toast(page, "La session a expiré !", True)
-                    return
-
-                page.update()
-                # print(f"Message modifié : {msg.content}")
-            # VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
-            except httpx.RequestError as ex:
-                await show_top_toast(page, "Erreur réseau !", True)
-                await page.push_route("/rooms")
-                return
-            # except Exception as e:
-            #     # En cas de problème réseau par exemple
-            #     await show_top_toast(page, "Erreur server !", True)
-            #     # print(e)
-            #     await page.push_route("/rooms")
-            #     return
+            await put_message(page, edit_message_input, msg)
 
         async def fermer_dialogue(e):
             page.pop_dialog()
@@ -531,8 +174,8 @@ async def ChatView(page: ft.Page):
             modal=True,
             content=ft.Column(edit_message_input, tight=True),
             actions=[
-                ft.ElevatedButton("Valider", on_click=valider_changement),
-                ft.TextButton("Annuler", on_click=fermer_dialogue),
+                ft.Button("Annuler", on_click=fermer_dialogue),
+                ft.FilledButton("Valider", on_click=valider_changement),
             ],
             actions_alignment=ft.MainAxisAlignment.CENTER,
         )
@@ -547,20 +190,7 @@ async def ChatView(page: ft.Page):
         async def on_emoji_click(click_event, emoji_char):
             # 1. Fermer le menu en priorité (Flet 0.80.5 style)
             page.pop_dialog()
-            # 2. Appeler ton API pour envoyer la réaction
-            try:
-                response = await api.post(f"/message/{msg.id}/reaction", data={"emoji": emoji_char})
-                # Si le jeton est expiré ou invalide (401)
-                if response.status_code == 401:
-                    await show_top_toast(page, "La session a expiré !", True)
-                    await page.push_route("/login")  # On redirige
-                    return
-
-            # VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
-            except httpx.RequestError as ex:
-                await show_top_toast(page, "Erreur réseau !", True)
-                await page.push_route("/rooms")
-                return
+            await post_reaction(page, msg.id, emoji_char)
 
         # Construction de la grille d'emojis
         emoji_row = ft.Row(
@@ -578,34 +208,8 @@ async def ChatView(page: ft.Page):
             if not report_reason_input.value.strip():
                 report_reason_input.error = "Le champ ne doit pas être vide !"
                 return
-
             report_dialog.open = False
-
-            # 3. On demande la liste fraîche au serveur
-            try:
-                payload = {"message_id": msg.id, "raison": report_reason_input.value.strip()}
-                response = await api.post(f"/reports", data=payload)
-
-                # Si le jeton est expiré ou invalide (401)
-                if response.status_code != 201:
-                    await show_top_toast(page, "Erreur lors du signalement !", True)
-                    report_reason_input.error = "Il y a eu urreur lors du signalement !"
-                    return
-
-                await show_top_toast(page, "Signalement envoyé à la modération.")
-
-            # VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
-            except httpx.RequestError as ex:
-                await show_top_toast(page, "Erreur réseau !", True)
-                report_reason_input.error = "Serveur injoignable"
-                page.update()
-                return
-            # except Exception as e:
-            #     # En cas de problème réseau par exemple
-            #     report_reason_input.error = "Erreur de connexion !"
-            #     page.update()
-            #     await show_top_toast(page, "Erreur de connexion !", True)
-            #     return
+            await post_report(page, msg.id, report_reason_input)
 
         def cancel_report(e):
             report_dialog.open = False
@@ -638,20 +242,7 @@ async def ChatView(page: ft.Page):
             page.pop_dialog()
 
         async def confirm_delete(e):
-            try:
-                response = await api.delete(endpoint=f"/message/{msg.id}")
-
-                if response.status_code != 204:
-                    await show_top_toast(page, response.json().get("detail", "Erreur lors de la suppression !"), True)
-                    return
-
-                page.pop_dialog()
-                await show_top_toast(page, "Message supprimé !")
-
-            except httpx.RequestError as ex:
-                await show_top_toast(page, "Erreur lors de la suppression !", True)
-                page.update()
-                return
+            await delete_message_bdd(page, msg.id)
 
         page.pop_dialog()
         dlg = ft.AlertDialog(
@@ -670,51 +261,34 @@ async def ChatView(page: ft.Page):
         # await ft.Clipboard().set(value=new_message.value.strip())
 
         parent_id = replying_to_message.id if replying_to_message else None
-        # 3. On demande la liste fraîche au serveur
-        try:
-            payload = {"content": new_message.value.strip(), "parent_id": parent_id}
-            response = await api.post(f"/room/{current_room_id}/messages", data=payload)
 
-            # Si le jeton est expiré ou invalide (401)
-            if response.status_code != 201:
-                await show_top_toast(page, "Erreur lors de l'envoi du message !", True)
-                new_message.error = "Message non envoyé !"
-                page.update()
-                return
-
-            message = response.json()
-            storage.set(f"last_read_{current_room_id}", message["id"])
-
-            new_message.error = None
-            new_message.value = ""
-            await cancel_reply(None)
-            await new_message.focus()
-            page.update()
-
-            message_datetime = datetime.strptime(message["created_at"], "%Y-%m-%dT%H:%M:%S")
-            message_date = message_datetime.date()
-            message_time = message_datetime.time()
-
-            # On envoie le pubsub si le message est arrivé en bdd
-            page.pubsub.send_all(
-                Message(
-                    id=message["id"],
-                    pseudo=message["author_display_name"],
-                    content=message["content"],
-                    message_type=message["message_type"],
-                    modified=message["modified"],
-                    parent_id=message["parent_id"],
-                    message_datetime=message_datetime,
-                    message_date=message_date,
-                    message_time=message_time,
-                )
-            )
-        # VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
-        except httpx.RequestError as ex:
-            await show_top_toast(page, "Erreur lors de l'envoi du message !", True)
-            new_message.error = "Erreur, Message non envoyé !"
-            page.update()
+        message = await post_message(page, current_room_id, parent_id, new_message)
+        if not message:
             return
+
+        storage.set(f"last_read_{current_room_id}", message["id"])
+
+        await cancel_reply(None)
+        page.update()
+
+        message_datetime = datetime.strptime(message["created_at"], "%Y-%m-%dT%H:%M:%S")
+        message_date = message_datetime.date()
+        message_time = message_datetime.time()
+
+        # On envoie le pubsub si le message est arrivé en bdd
+        page.pubsub.send_all(
+            Message(
+                id=message["id"],
+                pseudo=message["author_display_name"],
+                content=message["content"],
+                message_type=message["message_type"],
+                modified=message["modified"],
+                parent_id=message["parent_id"],
+                message_datetime=message_datetime,
+                message_date=message_date,
+                message_time=message_time,
+            )
+        )
 
     def on_message(message: Message):
         if message.message_type in ["join", "quit"]:
@@ -809,7 +383,7 @@ async def ChatView(page: ft.Page):
                     last_date = message_date
                 on_message(me)
             chat_list.update()
-            await asyncio.slepp(0.05)
+            # await asyncio.slepp(0.05)
             await chat_list.scroll_to(offset=-1, duration=100)
             # On affiche le message
             # await asyncio.sleep(0.1)
@@ -821,27 +395,15 @@ async def ChatView(page: ft.Page):
             #         pass
             #     else:
             #         pass
-                    # Sinon, on va tout en bas
-                    # await chat_list.scroll_to(offset=-1, duration=100)
+            # Sinon, on va tout en bas
+            # await chat_list.scroll_to(offset=-1, duration=100)
 
     page.pubsub.subscribe(on_message)
 
     async def left_room(e):
         async def confirm_quit(e):
             page.pop_dialog()
-            try:
-                response = await api.post(f"/user/rooms/{current_room_id}/quit")
-                # Si le jeton est expiré ou invalide (401)
-                if response.status_code != 204:
-                    await show_top_toast(page, response.json().get("detail", "Erreur inconnue"), True)
-                    return
-
-                await page.push_route("/rooms")
-                await show_top_toast(page, "Salon supprimé")
-
-            except httpx.RequestError as ex:
-                await show_top_toast(page, "Erreur réseau !", True)
-                return
+            await post_quit_room(page, current_room_id)
 
         def cancel_quit(e):
             page.pop_dialog()
