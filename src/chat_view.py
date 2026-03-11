@@ -6,6 +6,7 @@ import httpx
 from chat.components import MyChatMessage, OtherChatMessage, SystemMessage
 from chat.models import Message
 from chat.api import fetch_room_messages, put_message, post_reaction, post_report, delete_message_bdd, post_message, post_quit_room
+from chat.dialogs import show_edit_dialog, show_delete_dialog, show_report_dialog, show_quit_dialog
 from utils import (
     get_initials,
     get_avatar_color,
@@ -56,6 +57,20 @@ async def ChatView(page: ft.Page):
         await page.push_route("/login")
 
     chat_list = ft.ListView(expand=True, spacing=15, auto_scroll=True, padding=10)
+    async def refresh_ui():
+        # 1. Récupérer les nouveaux messages via ton module API
+        updated_messages = await fetch_room_messages(page, current_room_id)
+
+        if updated_messages is not None:
+            # 2. Vider la liste visuelle (ListView)
+            chat_list.controls.clear()
+
+            # 3. Relancer l'affichage (réutilise ta fonction show_messages existante)
+            await show_messages(updated_messages, first_load=False)
+
+            # 4. Mettre à jour l'interface
+            page.update()
+
 
     chat_container = ft.Container(
         content=chat_list,
@@ -155,32 +170,33 @@ async def ChatView(page: ft.Page):
         await show_top_toast(page, "Message copié.")
 
     async def edit_message(e, msg: Message):
-        async def valider_changement(e):
-            page.pop_dialog()
-            if edit_message_input == msg.content:
-                return
-            msg.content = edit_message_input.value.strip()
+        await show_edit_dialog(page, msg, on_success=refresh_ui)
+        # async def valider_changement(e):
+        #     page.pop_dialog()
+        #     if edit_message_input == msg.content:
+        #         return
+        #     msg.content = edit_message_input.value.strip()
 
-            await put_message(page, edit_message_input, msg)
+        #     await put_message(page, edit_message_input, msg)
 
-        async def fermer_dialogue(e):
-            page.pop_dialog()
+        # async def fermer_dialogue(e):
+        #     page.pop_dialog()
 
-        page.pop_dialog()
+        # page.pop_dialog()
 
-        edit_message_input = ft.TextField(value=msg.content, label="Message", multiline=True, autofocus=True)
-        dlg = ft.AlertDialog(
-            title=ft.Text("Modifier le message"),
-            modal=True,
-            content=ft.Column(edit_message_input, tight=True),
-            actions=[
-                ft.Button("Annuler", on_click=fermer_dialogue),
-                ft.FilledButton("Valider", on_click=valider_changement),
-            ],
-            actions_alignment=ft.MainAxisAlignment.CENTER,
-        )
+        # edit_message_input = ft.TextField(value=msg.content, label="Message", multiline=True, autofocus=True)
+        # dlg = ft.AlertDialog(
+        #     title=ft.Text("Modifier le message"),
+        #     modal=True,
+        #     content=ft.Column(edit_message_input, tight=True),
+        #     actions=[
+        #         ft.Button("Annuler", on_click=fermer_dialogue),
+        #         ft.FilledButton("Valider", on_click=valider_changement),
+        #     ],
+        #     actions_alignment=ft.MainAxisAlignment.CENTER,
+        # )
 
-        page.show_dialog(dlg)
+        # page.show_dialog(dlg)
 
     async def react_to_message(e, msg: Message):
         # Liste de tes emojis supportés
@@ -468,43 +484,6 @@ async def ChatView(page: ft.Page):
         # --- MENU 3 POINTS ---
         actions=[default_menu],
     )
-
-    # return ft.View(
-    #     route="/chat",
-    #     controls=[
-    #         app_bar,
-    #         ft.Container(
-    #             content=chat_container,
-    #             padding=0,
-    #             expand=True,
-    #         ),
-    #         # ft.Stack(scroll_btn),
-    #         ft.Container(
-    #             content=ft.Column(
-    #                 spacing=0,
-    #                 controls=[
-    #                     reply_banner,
-    #                     ft.Row(
-    #                         [
-    #                             new_message,
-    #                             ft.IconButton(
-    #                                 icon=ft.Icons.SEND_ROUNDED,
-    #                                 icon_color="blue",
-    #                                 tooltip="Envoyer",
-    #                                 on_click=send_click,
-    #                             ),
-    #                         ]
-    #                     ),
-    #                 ],
-    #             ),
-    #             padding=ft.padding.Padding(left=10, top=5, right=10, bottom=15),
-    #         ),
-    #     ],
-    # )
-    async def load_messages(messages):
-        await show_messages(messages, True)
-
-    page.run_task(load_messages, messages_received)
 
     return ft.View(
         route="/chat",
