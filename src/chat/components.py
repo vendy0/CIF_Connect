@@ -264,7 +264,7 @@ class OtherChatMessage(BaseChatMessage):
             ft.ListTile(
                 leading=ft.Icon(ft.Icons.REPORT, color="error"),
                 title=ft.Text("Signaler"),
-                on_click=lambda _: self.on_report(self.message),
+                on_click=lambda e: self._page_ref.run_task(self.on_report, e, self.message),
             ),
         ]
 

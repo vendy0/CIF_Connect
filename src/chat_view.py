@@ -57,6 +57,7 @@ async def ChatView(page: ft.Page):
         await page.push_route("/login")
 
     chat_list = ft.ListView(expand=True, spacing=15, auto_scroll=True, padding=10)
+
     async def refresh_ui():
         # 1. Récupérer les nouveaux messages via ton module API
         updated_messages = await fetch_room_messages(page, current_room_id)
@@ -70,7 +71,6 @@ async def ChatView(page: ft.Page):
 
             # 4. Mettre à jour l'interface
             page.update()
-
 
     chat_container = ft.Container(
         content=chat_list,
@@ -170,33 +170,8 @@ async def ChatView(page: ft.Page):
         await show_top_toast(page, "Message copié.")
 
     async def edit_message(e, msg: Message):
+        page.pop_dialog()
         await show_edit_dialog(page, msg, on_success=refresh_ui)
-        # async def valider_changement(e):
-        #     page.pop_dialog()
-        #     if edit_message_input == msg.content:
-        #         return
-        #     msg.content = edit_message_input.value.strip()
-
-        #     await put_message(page, edit_message_input, msg)
-
-        # async def fermer_dialogue(e):
-        #     page.pop_dialog()
-
-        # page.pop_dialog()
-
-        # edit_message_input = ft.TextField(value=msg.content, label="Message", multiline=True, autofocus=True)
-        # dlg = ft.AlertDialog(
-        #     title=ft.Text("Modifier le message"),
-        #     modal=True,
-        #     content=ft.Column(edit_message_input, tight=True),
-        #     actions=[
-        #         ft.Button("Annuler", on_click=fermer_dialogue),
-        #         ft.FilledButton("Valider", on_click=valider_changement),
-        #     ],
-        #     actions_alignment=ft.MainAxisAlignment.CENTER,
-        # )
-
-        # page.show_dialog(dlg)
 
     async def react_to_message(e, msg: Message):
         # Liste de tes emojis supportés
@@ -217,58 +192,13 @@ async def ChatView(page: ft.Page):
         picker = ft.BottomSheet(content=ft.Container(content=emoji_row, padding=20, height=100))
         page.show_dialog(picker)
 
-    async def report_message(msg: Message):
-        report_reason_input = ft.TextField(label="Raison du signalement", multiline=True)
-
-        async def submit_report(e):
-            if not report_reason_input.value.strip():
-                report_reason_input.error = "Le champ ne doit pas être vide !"
-                return
-            report_dialog.open = False
-            await post_report(page, msg.id, report_reason_input)
-
-        def cancel_report(e):
-            report_dialog.open = False
-            page.update()
-
-        report_dialog = ft.AlertDialog(
-            title=ft.Text("Signaler ce message"),
-            content=ft.Column(
-                tight=True,
-                controls=[
-                    ft.Text(f"Message de {msg.pseudo} :"),
-                    ft.Text(f'"{msg.content}"', italic=True),
-                    report_reason_input,
-                ],
-            ),
-            actions=[
-                ft.TextButton(content="Annuler", on_click=cancel_report),
-                ft.ElevatedButton(
-                    "Envoyer",
-                    bgcolor=ft.Colors.ERROR,
-                    color=ft.Colors.WHITE,
-                    on_click=submit_report,
-                ),
-            ],
-        )
-        page.show_dialog(report_dialog)
+    async def report_message(e, msg: Message):
+        page.pop_dialog()
+        await show_report_dialog(page, msg.id)
 
     async def delete_message(e, msg: Message):
-        async def cancel_delete(e):
-            page.pop_dialog()
-
-        async def confirm_delete(e):
-            await delete_message_bdd(page, msg.id)
-
         page.pop_dialog()
-        dlg = ft.AlertDialog(
-            content=ft.Text("Voulez vous vraiment supprimer ce message ?"),
-            actions=[
-                ft.Button("Annuler", on_click=cancel_delete),
-                ft.FilledButton("Supprimer", on_click=confirm_delete),
-            ],
-        )
-        page.show_dialog(dlg)
+        await show_delete_dialog(page, msg.id, on_success=refresh_ui)
 
     async def send_click(e):
         if not new_message.value.strip():
@@ -305,6 +235,7 @@ async def ChatView(page: ft.Page):
                 message_time=message_time,
             )
         )
+        await refresh_ui()
 
     def on_message(message: Message):
         if message.message_type in ["join", "quit"]:
@@ -417,21 +348,7 @@ async def ChatView(page: ft.Page):
     page.pubsub.subscribe(on_message)
 
     async def left_room(e):
-        async def confirm_quit(e):
-            page.pop_dialog()
-            await post_quit_room(page, current_room_id)
-
-        def cancel_quit(e):
-            page.pop_dialog()
-
-        dlg = ft.AlertDialog(
-            content=ft.Text("Voulez vous vraiment quitter ce salon ?"),
-            actions=[
-                ft.Button("Annuler", on_click=cancel_quit),
-                ft.FilledButton("Quitter", on_click=confirm_quit),
-            ],
-        )
-        page.show_dialog(dlg)
+        await show_quit_dialog(page, current_room_id)
 
     search_input = ft.TextField(hint_text="Rechercher...", expand=True, autofocus=True, border=ft.InputBorder.NONE, on_change=lambda e: filter_messages(e.control.value))
 
@@ -460,10 +377,12 @@ async def ChatView(page: ft.Page):
     default_menu = ft.PopupMenuButton(
         items=[
             ft.PopupMenuItem(icon=ft.Icons.SEARCH, content=ft.Text("Rechercher un message"), on_click=toggle_search),
-            ft.PopupMenuItem(),
-            ft.PopupMenuItem(icon=ft.Icons.LOGOUT_ROUNDED, content=ft.Text("Quitter le salon"), on_click=left_room),
         ]
     )
+
+    if current_room_id != 1 and current_room_name != "Salon Général":
+        default_menu.items.append(ft.PopupMenuItem())
+        default_menu.items.append(ft.PopupMenuItem(icon=ft.Icons.LOGOUT_ROUNDED, content=ft.Text("Quitter le salon"), on_click=left_room))
 
     app_bar = ft.AppBar(
         # --- BOUTON RETOUR ---

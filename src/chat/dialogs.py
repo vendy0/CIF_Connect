@@ -48,9 +48,9 @@ async def show_report_dialog(page, msg_id):
     async def send_report(e):
         if not reason_input.value.strip():
             return
+        page.pop_dialog()
         payload = {"message_id": msg_id, "reason": reason_input.value.strip()}
         await post_report(page, msg_id, reason_input)
-        page.pop_dialog()
 
     dialog = ft.AlertDialog(
         title=ft.Text("Signaler le message"),
