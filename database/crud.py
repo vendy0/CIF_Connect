@@ -1,4 +1,4 @@
-from sqlalchemy import select, delete, insert, func, desc
+from sqlalchemy import select, delete, insert, func, desc, case
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.exc import IntegrityError
 from database.models import User, Room, Message, Reaction, user_room, Report
@@ -114,38 +114,45 @@ def update_user_pseudo(db: Session, user_id: int, new_pseudo: str):
 
 
 # def get_all_rooms(db: Session):
-#     # Charge aussi le créateur pour l'affichage
-#     stmt = select(Room).options(joinedload(Room.creator))
+#     # Sous-requête pour trouver la date du dernier message par salon
+#     last_msg_sub = select(Message.room_id, func.max(Message.created_at).label("last_message_date")).group_by(Message.room_id).subquery()
+
+#     stmt = (
+#         select(Room)
+#         .options(joinedload(Room.creator))
+#         # Jointure avec la sous-requête
+#         .outerjoin(last_msg_sub, Room.id == last_msg_sub.c.room_id)
+#         # Tri : les dates récentes d'abord, puis par date de création du salon si pas de message
+#         .order_by(desc(last_msg_sub.c.last_message_date), desc(Room.created_at))
+#     )
+
+#     return db.execute(stmt).scalars().all()
+
+# def get_user_rooms(db: Session, user_id: int):
+#     # Même sous-requête pour la date du dernier message
+#     last_msg_sub = (
+#         select(
+#             Message.room_id,
+#             func.max(Message.created_at).label("last_message_date")
+#         )
+#         .group_by(Message.room_id)
+#         .subquery()
+#     )
+
+#     stmt = (
+#         select(Room)
+#         .options(joinedload(Room.creator))
+#         # Jointure avec la table d'association user_room pour filtrer l'utilisateur
+#         .join(user_room, Room.id == user_room.c.room_id)
+#         .outerjoin(last_msg_sub, Room.id == last_msg_sub.c.room_id)
+#         .where(user_room.c.user_id == user_id)
+#         .order_by(desc(last_msg_sub.c.last_message_date), desc(Room.created_at))
+#     )
 #     return db.execute(stmt).scalars().all()
 
 
-# def get_user_rooms(db: Session, user_id: int):
-#     # Récupère l'utilisateur et charge ses salons
-#     stmt = select(User).options(joinedload(User.rooms).joinedload(Room.creator)).where(User.id == user_id)
-#     user = db.execute(stmt).scalars().first()
-
-#     if not user:
-#         return []
-#     return user.rooms
-
-
 def get_all_rooms(db: Session):
-    # Sous-requête pour trouver la date du dernier message par salon
-    last_msg_sub = select(Message.room_id, func.max(Message.created_at).label("last_message_date")).group_by(Message.room_id).subquery()
-
-    stmt = (
-        select(Room)
-        .options(joinedload(Room.creator))
-        # Jointure avec la sous-requête
-        .outerjoin(last_msg_sub, Room.id == last_msg_sub.c.room_id)
-        # Tri : les dates récentes d'abord, puis par date de création du salon si pas de message
-        .order_by(desc(last_msg_sub.c.last_message_date), desc(Room.created_at))
-    )
-
-    return db.execute(stmt).scalars().all()
-
-def get_user_rooms(db: Session, user_id: int):
-    # Même sous-requête pour la date du dernier message
+    # Sous-requête pour la date du dernier message
     last_msg_sub = (
         select(
             Message.room_id, 
@@ -158,11 +165,34 @@ def get_user_rooms(db: Session, user_id: int):
     stmt = (
         select(Room)
         .options(joinedload(Room.creator))
-        # Jointure avec la table d'association user_room pour filtrer l'utilisateur
+        .outerjoin(last_msg_sub, Room.id == last_msg_sub.c.room_id)
+        .order_by(
+            # Critère 1 : Force l'ID 1 en haut (True > False en SQL)
+            desc(Room.id == 1),
+            # Critère 2 : Dernier message
+            desc(last_msg_sub.c.last_message_date),
+            # Critère 3 : Date de création du salon (fallback)
+            desc(Room.created_at)
+        )
+    )
+    
+    return db.execute(stmt).scalars().all()
+
+
+def get_user_rooms(db: Session, user_id: int):
+    last_msg_sub = select(Message.room_id, func.max(Message.created_at).label("last_message_date")).group_by(Message.room_id).subquery()
+
+    stmt = (
+        select(Room)
+        .options(joinedload(Room.creator))
         .join(user_room, Room.id == user_room.c.room_id)
         .outerjoin(last_msg_sub, Room.id == last_msg_sub.c.room_id)
         .where(user_room.c.user_id == user_id)
-        .order_by(desc(last_msg_sub.c.last_message_date), desc(Room.created_at))
+        .order_by(
+            desc(Room.id == 1),  # Toujours le salon 1 en premier
+            desc(last_msg_sub.c.last_message_date),
+            desc(Room.created_at),
+        )
     )
 
     return db.execute(stmt).scalars().all()
