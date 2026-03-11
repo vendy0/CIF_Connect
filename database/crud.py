@@ -113,54 +113,9 @@ def update_user_pseudo(db: Session, user_id: int, new_pseudo: str):
 # ==============================================================================
 
 
-# def get_all_rooms(db: Session):
-#     # Sous-requête pour trouver la date du dernier message par salon
-#     last_msg_sub = select(Message.room_id, func.max(Message.created_at).label("last_message_date")).group_by(Message.room_id).subquery()
-
-#     stmt = (
-#         select(Room)
-#         .options(joinedload(Room.creator))
-#         # Jointure avec la sous-requête
-#         .outerjoin(last_msg_sub, Room.id == last_msg_sub.c.room_id)
-#         # Tri : les dates récentes d'abord, puis par date de création du salon si pas de message
-#         .order_by(desc(last_msg_sub.c.last_message_date), desc(Room.created_at))
-#     )
-
-#     return db.execute(stmt).scalars().all()
-
-# def get_user_rooms(db: Session, user_id: int):
-#     # Même sous-requête pour la date du dernier message
-#     last_msg_sub = (
-#         select(
-#             Message.room_id,
-#             func.max(Message.created_at).label("last_message_date")
-#         )
-#         .group_by(Message.room_id)
-#         .subquery()
-#     )
-
-#     stmt = (
-#         select(Room)
-#         .options(joinedload(Room.creator))
-#         # Jointure avec la table d'association user_room pour filtrer l'utilisateur
-#         .join(user_room, Room.id == user_room.c.room_id)
-#         .outerjoin(last_msg_sub, Room.id == last_msg_sub.c.room_id)
-#         .where(user_room.c.user_id == user_id)
-#         .order_by(desc(last_msg_sub.c.last_message_date), desc(Room.created_at))
-#     )
-#     return db.execute(stmt).scalars().all()
-
-
 def get_all_rooms(db: Session):
     # Sous-requête pour la date du dernier message
-    last_msg_sub = (
-        select(
-            Message.room_id, 
-            func.max(Message.created_at).label("last_message_date")
-        )
-        .group_by(Message.room_id)
-        .subquery()
-    )
+    last_msg_sub = select(Message.room_id, func.max(Message.created_at).label("last_message_date")).group_by(Message.room_id).subquery()
 
     stmt = (
         select(Room)
@@ -172,10 +127,10 @@ def get_all_rooms(db: Session):
             # Critère 2 : Dernier message
             desc(last_msg_sub.c.last_message_date),
             # Critère 3 : Date de création du salon (fallback)
-            desc(Room.created_at)
+            desc(Room.created_at),
         )
     )
-    
+
     return db.execute(stmt).scalars().all()
 
 
@@ -222,8 +177,19 @@ def create_room(db: Session, room_data: CreateRoomSchema, creator_id: int):
         if creator:
             new_room.users.append(creator)
 
-        db.commit()
         db.refresh(new_room)
+        
+        # Message système
+        sys_msg = Message(
+            content=f"{creator.pseudo} a créé le salon.",
+            author_id=creator.id,
+            room_id=new_room.id,
+            message_type="join",
+            author_display_name=creator.pseudo,
+        )
+        db.add(sys_msg)
+
+        db.commit()
         return new_room
 
     except IntegrityError:

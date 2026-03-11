@@ -137,6 +137,7 @@ class RoomSchema(BaseModel):
 	id: int
 	name: str
 	description: str
+	access_key: Optional[str]
 	icon: int
 	created_at: datetime
 	creator: Optional[UserMinimalSchema]  # Optional car le créateur peut avoir été supprimé

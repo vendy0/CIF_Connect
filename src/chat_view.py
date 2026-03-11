@@ -388,7 +388,7 @@ async def ChatView(page: ft.Page):
         # --- BOUTON RETOUR ---
         leading=ft.IconButton(
             icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED,
-            on_click=lambda _: page.run_task(page.push_route, "/rooms"),  # Utilise page.go() pour la navigation Flet moderne
+            on_click=lambda _: page.views.pop(), 
         ),
         leading_width=40,
         # --- TITRE CLIQUABLE (Pour les infos du salon) ---

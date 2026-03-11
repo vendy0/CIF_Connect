@@ -18,7 +18,7 @@ async def show_edit_dialog(page, msg, on_success):
         title=ft.Text("Modifier le message"),
         content=edit_input,
         actions=[
-            ft.TextButton("Annuler", on_click=lambda _: page.close(dialog)),
+            ft.TextButton("Annuler", on_click=lambda _: page.pop_dialog()),
             ft.FilledButton("Enregistrer", on_click=save_click),
         ],
     )
@@ -56,7 +56,7 @@ async def show_report_dialog(page, msg_id):
         title=ft.Text("Signaler le message"),
         content=reason_input,
         actions=[
-            ft.TextButton("Annuler", on_click=lambda _: page.close(dialog)),
+            ft.TextButton("Annuler", on_click=lambda _: page.pop_dialog()),
             ft.FilledButton("Signaler", on_click=send_report),
         ],
     )
@@ -73,7 +73,7 @@ async def show_quit_dialog(page, room_id):
         title=ft.Text("Quitter le salon"),
         content=ft.Text("Voulez-vous vraiment quitter ce salon ?"),
         actions=[
-            ft.TextButton("Annuler", on_click=lambda _: page.close(dialog)),
+            ft.TextButton("Annuler", on_click=lambda _: page.pop_dialog()),
             ft.FilledButton("Quitter", on_click=confirm_quit, icon_color="red"),
         ],
     )

@@ -66,10 +66,14 @@ class Room:
             # trailing=ft.Icon(ft.Icons.CHEVRON_RIGHT),
             data=self.id,
             on_click=self.join_room,
-            trailing=ft.Column([
-                ft.Text("10:37", size=10, color=ft.Colors.ON_SURFACE_VARIANT), # Heure du dernier msg
-                unread_badge
-            ], alignment=ft.MainAxisAlignment.CENTER, spacing=2),
+            trailing=ft.Column(
+                [
+                    ft.Text("10:37", size=10, color=ft.Colors.ON_SURFACE_VARIANT),  # Heure du dernier msg
+                    unread_badge,
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=2,
+            ),
         )
 
     async def join_room(self, e):
@@ -222,7 +226,9 @@ def get_colors():
         return ["#FF5733", "#33FF57", "#3357FF", "#F0F0F0"]
     return cols
 
+
 COLORS_LOOKUP = get_colors()
+
 
 def get_avatar_color(username, colors_lookup=COLORS_LOOKUP):
     # Création d'un hash unique à partir du pseudo

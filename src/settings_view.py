@@ -149,6 +149,6 @@ async def SettingsView(page: ft.Page):
             ),
             ft.Divider(),
             ft.TextButton("Déconnexion", icon=ft.Icons.LOGOUT, on_click=go_login),
-            ft.TextButton("Retour", icon=ft.Icons.ARROW_BACK, on_click=go_back),
+            ft.TextButton("Retour", icon=ft.Icons.ARROW_BACK, on_click=lambda _: page.views.pop()),
         ],
     )

@@ -1,7 +1,7 @@
 import flet as ft
 import httpx
 from utils import Room, api, show_top_toast
-import asyncio
+import json
 
 
 host = "127.0.0.1"
@@ -10,7 +10,7 @@ port = "8000"
 
 async def RoomsView(page: ft.Page):
     # 1. On récupère le badge de sécurité (le token)
-    sp = ft.SharedPreferences()
+    storage = ft.SharedPreferences()
 
     async def go_to_new_room(e):
         await page.push_route("/new_room")
@@ -33,11 +33,17 @@ async def RoomsView(page: ft.Page):
             response = await api.get("/user/rooms")
 
             if response.status_code == 401:
-                await sp.remove("cif_token")
+                await storage.remove("cif_token")
                 await page.push_route("/login")
                 return
 
             data = response.json()
+
+            # Dans rooms_view.py, juste après "rooms = response.json()"
+            await storage.set("rooms_cache", json.dumps(data))
+            storage.update()
+            ro = await storage.get("rooms_cache")
+            print(ro)
 
             if not data:
                 info_text.value = "Aucun salon disponible pour le moment"
@@ -55,7 +61,7 @@ async def RoomsView(page: ft.Page):
                     icon=r["icon"],
                 )
                 room_list.controls.append(new_room_obj.controls)
-            
+
             # await asyncio.sleep(2)
             # On supprime le sleep(2) qui simulait une attente
             room_list.update()
