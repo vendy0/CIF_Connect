@@ -42,8 +42,6 @@ async def RoomsView(page: ft.Page):
             # Dans rooms_view.py, juste après "rooms = response.json()"
             await storage.set("rooms_cache", json.dumps(data))
             storage.update()
-            ro = await storage.get("rooms_cache")
-            print(ro)
 
             if not data:
                 info_text.value = "Aucun salon disponible pour le moment"
