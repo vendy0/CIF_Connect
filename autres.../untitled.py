@@ -1,52 +1,39 @@
 """
 # - Connexion avec email et vérification
+# - Mot de passe oublié
 # - Boite de dialogue de bienvenue
 # - Quand qlq'un change de pseudo faut l'avertir que ça se verra dans les rooms créés.
-# - Mot de passe oublié
+# - Ne peut pas changer de pseudo si les 7 jours ne sont pas encore écoulés
 # - Quand il y a une nouvelle version
 # - Mot de passe oublié
-# - Reprendre une Room la où l'on s'est arrêté
-# - Les chargements
-# - Rechercher un message
-# - Changer "/chat" par f"/rooms/{current_room_id}"
-# - Taguer
+# - Changer "/chat" par f"/room/{current_room_id}"
+# - Taguer (Un message) (Optionnel)
 # - Interface Administrateur
 # - Les marqueurs de dates visibles
 # - Annonces
 # - Mettre les options de message dans le swipe
 # - Swipe de l'autre coté affiche la date ou un truc du genre
 # - Rechercher un message ne l'affiche pas mais swipe jusqu'à lui. Je pensais plutôt faire une requête api si l'utilisateur demande plus parce que le chat ne contient que les 100 derniers messages. Cette requête retournerais tous les messages jusqu'à celui qu'on cherche.
-# - Afficher les salons en fonction du dernier message. On gerera peut-être avec les websockets
+# - Actualiser un seul élément plutôt que de refaire toute la liste
 # - Comment je conditionne ce unread messages
 # - Quitter le Salon général
 # - Afficher les salons à partir du dernier message reçu
+# - Les notifs
+
+
 # - Afficher les membres
 
-Maintenant je veux :
-Analyse attentivement ma chat_view
-- Rechercher un message dans le salon
-- Quand on scroll ça doit afficher la dernière date (style whatsapp). Quand on arrive à l'endroit où cette date délimite elle s'arrete et la date precedente prend le relai
-- Et puis je n'arrive pas à ajouter Scroll btn à la page
-- Pour le dernier message lu je comptais plutot utiliser la date pour reprendre la room où on l'a laissée
-- Afficher le nombre de messages non lus dans la room view (pour chaque room, style whatsapp). J'optimiserai plus tard avec les websocket pour chaque nouveau message reçu
 
-* Je veux que tu me fournisses la page info du salon (room_info.py). Sur cette page l'adm va pouvoir modifier les infos du salons comme c'est indiqué dans le crud.py. On pourra voir le nombre de membres totaux et combien sont en ligne (ex: 30/126 online). Je crois que je pourrais aussi afficher ça dans l'AppBar.
-- Sur la page y aura aussi l3 nom du salon, l'icon flet du salon aussi et les autres détails que tu juges nécéssaire. Et aussi le code du salon
 
-# Analyse attentivement la chat_view. Maintenant voila ce dont j'ai besoin :
-# - Un fond d'écran simple et doux qui s'adapte au thème à la manière de whatsapp
-# - Glisser un message vers la droite pour y répondre (comme la plupart des applications de chat)
-# - Le bouton qui affiche les émojis à gauche de la new_message_input (Je ne sais pas si flet possède des émojis préfabriqués)
-# - Reprendre une Room là où l'on l'a quittée (Je n'ai absolument aucune idée de comment faire ça)
-# - Puis une view quand on clique sur L'app bar qui affiche les infos du Salon (Nom, code invitation, description, Changer les informarions du salon (nom, description), Je ne sais pas si je peux afficher les utilisateurs même si c'est un adm pour l'anonymat, tu me donneras ton avis, avec les options qui vont suivre (Je ne sais pas si les répéter est une bonne chose))
+# Maintenant je veux :
+# Analyse attentivement ma chat_view
+# - Quand on scroll ça doit afficher la dernière date (style whatsapp). Quand on arrive à l'endroit où cette date délimite elle s'arrete et la date precedente prend le relai
+# - Et puis je n'arrive pas à ajouter Scroll btn à la page
+# - Pour le dernier message lu je comptais plutot utiliser la date pour reprendre la room où on l'a laissée
+# - Afficher le nombre de messages non lus dans la room view (pour chaque room, style whatsapp). J'optimiserai plus tard avec les websocket pour chaque nouveau message reçu
 
-# * Remplacer le bouton pour sortir de la Room par un menu (3 points) avec des options:
-# - Rechercher un message
-# - Quitter le Salon
-# - Modifier et supprimer un salon (Si on est adm du salon)
-# - Et d'autres truc interessants
 
-# - Puis un bouton à gauche de l'app bar pour retourner à la rooms_view
+# =========== LES WEBSOCKETS ========== #
 
 """
 # // "ON_PRIMARY",
@@ -72,6 +59,18 @@ Analyse attentivement ma chat_view
 # // "SURFACE_CONTAINER_HIGHEST",
 
 
+# - Les chargements
+# * Je veux que tu me fournisses la page info du salon (room_info.py). Sur cette page l'adm va pouvoir modifier les infos du salons comme c'est indiqué dans le crud.py. On pourra voir le nombre de membres totaux et combien sont en ligne (ex: 30/126 online). Je crois que je pourrais aussi afficher ça dans l'AppBar.
+# - Sur la page y aura aussi le nom du salon, l'icon flet du salon aussi et les autres détails que tu juges nécéssaire. Et aussi le code du salon
+# * Remplacer le bouton pour sortir de la Room par un menu (3 points) avec des options:
+# - Puis une view quand on clique sur L'app bar qui affiche les infos du Salon (Nom, code invitation, description, Changer les informarions du salon (nom, description), Je ne sais pas si je peux afficher les utilisateurs même si c'est un adm pour l'anonymat, tu me donneras ton avis, avec les options qui vont suivre (Je ne sais pas si les répéter est une bonne chose))
+# - Le bouton qui affiche les émojis à gauche de la new_message_input (Je ne sais pas si flet possède des émojis préfabriqués)
+# - Un fond d'écran simple et doux qui s'adapte au thème à la manière de whatsapp
+# - Puis un bouton à gauche de l'app bar pour retourner à la rooms_view
+# - Quitter le Salon
+# - Glisser un message vers la droite pour y répondre (comme la plupart des applications de chat)
+# - Modifier et supprimer un salon (Si on est adm du salon)
+# - Afficher les salons en fonction du dernier message. On gerera peut-être avec les websockets
 # - Faire un soft delete sur les rooms
 # - Ajouter d'autres icones
 # - Émoji

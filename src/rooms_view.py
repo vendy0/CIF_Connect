@@ -51,7 +51,7 @@ async def RoomsView(page: ft.Page):
 
 	room_list = ft.ListView(expand=True, spacing=2, padding=10)
 
-	info_text = ft.Text("Chargement des salons...", size=14, color=ft.Colors.GREY_500)
+	info_text = ft.Text("Chargement des salons...", size=14, margin=ft.margin.only(bottom=20), color=ft.Colors.GREY_500)
 	container_principal = ft.Container(
 		content=ft.ProgressRing(),  # Loader initial
 		expand=True,
@@ -96,7 +96,7 @@ async def RoomsView(page: ft.Page):
 					icon=r["icon"],
 				)
 				room_list.controls.append(new_room_obj.controls)
-				room_list.controls.append(ft.Divider())
+				room_list.controls.append(ft.Divider(height=2))
 
 			container_principal.content = room_list
 			container_principal.alignment = None

@@ -20,6 +20,35 @@ async def ChatView(page: ft.Page):
 	storage = ft.SharedPreferences()
 	token = await storage.get("cif_token")
 
+	def build_empty_chat_view():
+		return ft.Container(
+			content=ft.Column(
+				[
+					ft.Icon(
+						icon=ft.Icons.CHAT_BUBBLE_OUTLINE_ROUNDED,
+						size=80,
+						color=ft.Colors.OUTLINE_VARIANT,
+					),
+					ft.Text(
+						"Le silence est d'or...",
+						size=20,
+						weight="bold",
+						color=ft.Colors.ON_SURFACE,
+					),
+					ft.Text(
+						"Soyez le premier à briser la glace !\nEnvoyez un message pour commencer la discussion.",
+						size=14,
+						color=ft.Colors.OUTLINE,
+						text_align=ft.TextAlign.CENTER,
+					),
+				],
+				horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+				spacing=10,
+			),
+			alignment=ft.Alignment.CENTER,
+			expand=True,
+		)
+
 	current_room_id = page.session.store.get("current_room_id") or 1
 	current_room_name = page.session.store.get("current_room_name") or "Salon Inconnue..."
 	current_pseudo = await storage.get("user_pseudo") or "Anonyme"
@@ -36,6 +65,13 @@ async def ChatView(page: ft.Page):
 
 	chat_list = ft.ListView(expand=True, spacing=15, auto_scroll=True, padding=10)
 
+	# # 1. Création du container principal avec le Loader initial
+	# chm = ft.Container(
+	# 	content=ft.ProgressRing(),  # Ton loader
+	# 	expand=True,
+	# 	alignment=ft.Alignment.CENTER,
+	# )
+
 	async def refresh_ui():
 		# 1. Récupérer les nouveaux messages via ton module API
 		updated_messages = await fetch_room_messages(page, current_room_id)
@@ -51,7 +87,9 @@ async def ChatView(page: ft.Page):
 			page.update()
 
 	chat_container = ft.Container(
-		content=chat_list,
+		content=ft.ProgressRing(),
+		alignment=ft.Alignment.CENTER,
+		expand=True,
 		image=ft.DecorationImage(
 			# src="icon.png",
 			src="pattern.png",
@@ -77,8 +115,24 @@ async def ChatView(page: ft.Page):
 			await page.push_route("/rooms")
 			return
 
+		is_chat_message = False
+		for m in messages_received:
+			if m["message_type"] == "chat":
+				is_chat_message = True
+				break
+
+		if not is_chat_message:
+			# Cas où il n'y a aucun message
+			chat_container.content = build_empty_chat_view()
+			page.update()
+		else:
+			# Cas où il y a des messages
+			await show_messages(messages_received, first_load=True)
+			chat_container.content = chat_list
+			# On retire l'alignement center pour que la liste commence en haut
+			chat_container.alignment = None
+			page.update()
 		# Si tout est OK, on affiche
-		await show_messages(messages_received, first_load=True)
 
 	# 3. On lance le chargement SANS bloquer l'affichage de la vue
 	page.run_task(load_initial_data)
@@ -106,22 +160,7 @@ async def ChatView(page: ft.Page):
 			],
 		),
 	)
-
-	# for i in range(40):
-	#     chat_list.controls.append(ft.Text(f"Message #{i + 1}"))
-
-	new_message = ft.TextField(
-		hint_text="Écrivez un message...",
-		capitalization=ft.TextCapitalization.SENTENCES,
-		autofocus=False,
-		expand=True,
-		multiline=True,
-		min_lines=1,
-		max_lines=5,
-		border_radius=20,
-		# shift_enter=True,
-		# on_submit=lambda e: send_click(e),  # Sera awaité via le framework Flet
-	)
+	new_message = ft.TextField(hint_text="Écrivez un message...", capitalization=ft.TextCapitalization.SENTENCES, autofocus=False, expand=True, multiline=True, min_lines=1, max_lines=5, border_radius=20)
 
 	async def go_to_rooms(e):
 		page.session.store.remove("current_room_id")
@@ -186,7 +225,13 @@ async def ChatView(page: ft.Page):
 		if not message:
 			return
 
-		storage.set(f"last_read_{current_room_id}", message["id"])
+		# Dans send_click, juste après avoir reçu la réponse de post_message :
+		if chat_container.content != chat_list:
+			chat_container.content = chat_list
+			chat_container.alignment = None
+			page.update()
+
+		# await storage.set(f"last_read_{current_room_id}", message["id"])
 
 		await cancel_reply(None)
 		page.update()
@@ -209,7 +254,7 @@ async def ChatView(page: ft.Page):
 				message_time=message_time,
 			)
 		)
-		await refresh_ui()
+		# await refresh_ui()
 
 	def on_message(message: Message):
 		if message.message_type in ["join", "quit"]:
@@ -241,6 +286,7 @@ async def ChatView(page: ft.Page):
 						on_delete=delete_message,
 					)
 				)
+		page.update()
 
 	async def show_messages(messages_received, first_load=False):
 		nonlocal chat_list
@@ -303,8 +349,8 @@ async def ChatView(page: ft.Page):
 					chat_list.controls.append(date_divider)
 					last_date = message_date
 				on_message(me)
-			chat_list.update()
-			await chat_list.scroll_to(offset=-1, duration=100)
+			page.update()
+			# await chat_list.scroll_to(offset=-1, duration=100)
 			# On affiche le message
 			# if first_load:
 			#     last_read = await storage.get(f"last_read_{current_room_id}")
