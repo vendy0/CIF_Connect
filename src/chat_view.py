@@ -47,6 +47,7 @@ async def ChatView(page: ft.Page):
 			),
 			alignment=ft.Alignment.CENTER,
 			expand=True,
+			padding=ft.padding.only(top=200)
 		)
 
 	current_room_id = page.session.store.get("current_room_id") or 1
@@ -257,6 +258,8 @@ async def ChatView(page: ft.Page):
 		# await refresh_ui()
 
 	def on_message(message: Message):
+		# if message.parent_author == current_pseudo:
+		# 	print("VIBRATION")
 		if message.message_type in ["join", "quit"]:
 			chat_list.controls.append(SystemMessage(message))
 		elif message.message_type == "chat":
@@ -341,11 +344,15 @@ async def ChatView(page: ft.Page):
 
 				# Si le jour est différent du message précédent, on insère un badge de date
 				if message_date != last_date:
-					date_divider = ft.Container(
-						content=ft.Text(format_date(message_date), size=12, weight="bold"),
-						alignment=ft.Alignment.CENTER,
-						padding=ft.padding.symmetric(vertical=10),
-					)
+					# date_divider = ft.Container(
+					# 	content=ft.Text(format_date(message_date), size=12, weight="bold"),
+					# 	alignment=ft.Alignment.CENTER,
+					# 	padding=ft.padding.symmetric(vertical=10),
+					# )
+
+					# Dans ChatView, au moment de créer le date_divider
+					date_divider = ft.Container(content=ft.Text(format_date(message_date).upper(), size=11, weight="bold", color=ft.Colors.OUTLINE), alignment=ft.Alignment.CENTER, bgcolor=ft.Colors.with_opacity(0.1, ft.Colors.ON_SURFACE_VARIANT), padding=ft.padding.symmetric(horizontal=12, vertical=4), border_radius=10, margin=ft.margin.symmetric(vertical=10))
+
 					chat_list.controls.append(date_divider)
 					last_date = message_date
 				on_message(me)

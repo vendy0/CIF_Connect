@@ -7,21 +7,20 @@
 # - Quand il y a une nouvelle version
 # - Mot de passe oublié
 # - Changer "/chat" par f"/room/{current_room_id}"
-# - Taguer (Un message) (Optionnel)
 # - Interface Administrateur
 # - Les marqueurs de dates visibles
 # - Annonces
-# - Mettre les options de message dans le swipe
-# - Swipe de l'autre coté affiche la date ou un truc du genre
-# - Rechercher un message ne l'affiche pas mais swipe jusqu'à lui. Je pensais plutôt faire une requête api si l'utilisateur demande plus parce que le chat ne contient que les 100 derniers messages. Cette requête retournerais tous les messages jusqu'à celui qu'on cherche.
 # - Actualiser un seul élément plutôt que de refaire toute la liste
 # - Comment je conditionne ce unread messages
 # - Quitter le Salon général
 # - Afficher les salons à partir du dernier message reçu
 # - Les notifs
+# - Mettre à jour la page room_info pour changer le nombre de membres en ligne
+
+# - Mettre les options de message dans le swipe
 
 
-# - Afficher les membres
+# - Rechercher un message ne l'affiche pas mais swipe jusqu'à lui. Je pensais plutôt faire une requête api si l'utilisateur demande plus parce que le chat ne contient que les 100 derniers messages. Cette requête retournerais tous les messages jusqu'à celui qu'on cherche.
 
 
 
@@ -59,6 +58,9 @@
 # // "SURFACE_CONTAINER_HIGHEST",
 
 
+# - Afficher les membres
+# - Swipe de l'autre coté affiche la date ou un truc du genre
+# - Taguer (Un message) (Optionnel)
 # - Les chargements
 # * Je veux que tu me fournisses la page info du salon (room_info.py). Sur cette page l'adm va pouvoir modifier les infos du salons comme c'est indiqué dans le crud.py. On pourra voir le nombre de membres totaux et combien sont en ligne (ex: 30/126 online). Je crois que je pourrais aussi afficher ça dans l'AppBar.
 # - Sur la page y aura aussi le nom du salon, l'icon flet du salon aussi et les autres détails que tu juges nécéssaire. Et aussi le code du salon

@@ -48,6 +48,8 @@ async def RoomInfoView(page: ft.Page):
 
 	# --- FONCTION POUR GÉNÉRER UN NOUVEAU CODE ---
 	async def handle_refresh_code(e):
+		nonlocal input_change
+		input_change = True
 		new_code = generate_secure_code()
 		code_field.value = new_code
 		page.update()
@@ -92,7 +94,29 @@ async def RoomInfoView(page: ft.Page):
 		page.show_dialog(confirm_dialog)
 		page.update()
 
-	members_list = ft.ListView(spacing=5, padding=10, height=300)
+	# Au lieu de la ListView, on crée un Row horizontal
+	members_info_row = ft.Row(
+		controls=[
+			ft.Icon(ft.Icons.PEOPLE_ALT_ROUNDED, color=ft.Colors.PRIMARY, size=20),
+			ft.Text(
+				"0 / 0 membres en ligne",  # On mettra à jour ce texte dynamiquement
+				size=16,
+				weight=ft.FontWeight.W_500,
+				color=ft.Colors.ON_SURFACE_VARIANT,
+			),
+		],
+		alignment=ft.MainAxisAlignment.CENTER,
+		spacing=10,
+	)
+
+	# On l'enveloppe dans un container pour le centrer et lui donner du style
+	members_container = ft.Container(
+		content=members_info_row,
+		bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
+		padding=ft.padding.symmetric(horizontal=20, vertical=15),
+		border_radius=15,
+		margin=ft.margin.only(top=10),
+	)
 
 	async def load_room_info():
 		nonlocal is_admin
@@ -143,21 +167,14 @@ async def RoomInfoView(page: ft.Page):
 				btn_copy.visible = True
 				btn_copy.on_click = lambda e: page.run_task(copy_message, e, page, code_field.value, "Code copié !")
 				delete_btn.visible = True
-				# room_name_display.spans = [ft.TextSpan(" (Cliquer sur l'icône pour changer)", style=ft.TextStyle(size=10, color=ft.Colors.OUTLINE))]
-			# Simulation d'affichage des membres (À relier à une route API qui liste les membres de la room)
-			members = [{"pseudo": "RapideRenard5"}, {"pseudo": "CalmeHibou42"}]  # Exemple
 
-			members_list.controls.clear()
-			for m in members:
-				members_list.controls.append(
-					ft.ListTile(
-						leading=ft.CircleAvatar(
-							content=ft.Text(get_initials(m["pseudo"])),
-							bgcolor=get_avatar_color(m["pseudo"], COLORS_LOOKUP),
-						),
-						title=ft.Text(m["pseudo"], weight="bold"),
-					)
-				)
+				# Exemple de ce que tu mettras dans ta fonction de chargement :
+				total_members = room_data.get("total_members", 0)
+				online_members = room_data.get("online_members", 0)
+
+				# Mise à jour du texte (c'est le 2ème contrôle dans le Row)
+				members_info_row.controls[1].value = f"{online_members} / {total_members} membres en ligne"
+
 			page.update()
 
 		except httpx.RequestError:
@@ -186,7 +203,7 @@ async def RoomInfoView(page: ft.Page):
 			if response.status_code == 200:
 				await show_top_toast(page, "Modifications enregistrées !")
 				page.session.store.set("current_room_name", name_field.value)
-				room_name_display = (name_field.value,)
+				room_name_display = name_field.value
 				await refresh_rooms(page, storage)
 				page.run_task(load_room_info)
 
@@ -255,12 +272,7 @@ async def RoomInfoView(page: ft.Page):
 										],
 										alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
 									),
-									ft.Container(
-										content=members_list,
-										bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
-										border_radius=15,
-										padding=5,
-									),
+									members_container,
 								]
 							),
 							padding=ft.padding.symmetric(horizontal=20),
