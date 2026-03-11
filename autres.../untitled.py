@@ -20,8 +20,6 @@
 # - Comment je conditionne ce unread messages
 # - Quitter le Salon général
 # - Afficher les salons à partir du dernier message reçu
-# - Ajouter d'autres icones
-# - Faire un soft delete sur les rooms
 # - Afficher les membres
 
 Maintenant je veux :
@@ -73,6 +71,9 @@ Analyse attentivement ma chat_view
 # // "SURFACE_CONTAINER_HIGH",
 # // "SURFACE_CONTAINER_HIGHEST",
 
+
+# - Faire un soft delete sur les rooms
+# - Ajouter d'autres icones
 # - Émoji
 # - Modifier et supprimer un salon
 # - Glisser pour répondre
