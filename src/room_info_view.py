@@ -1,171 +1,237 @@
 import flet as ft
-from utils import api, show_top_toast, get_avatar_color, COLORS_LOOKUP, get_initials, copy_message, refresh_rooms
+from utils import api, show_top_toast, get_avatar_color, COLORS_LOOKUP, get_initials, copy_message, refresh_rooms, select_icon_dialog, generate_secure_code
 import httpx
 import json
 
 
 async def RoomInfoView(page: ft.Page):
-    storage = ft.SharedPreferences()
-    room_id = page.session.store.get("current_room_id")
-    current_user_id = await storage.get("user_id")  # Assure-toi de stocker ça au login
+	storage = ft.SharedPreferences()
+	room_id = page.session.store.get("current_room_id")
+	current_user_id = await storage.get("user_id")  # Assure-toi de stocker ça au login
 
-    if not room_id:
-        await page.push_route("/rooms")
-        return ft.View(route="/room_info")
+	if not room_id:
+		await page.push_route("/rooms")
+		return ft.View(route="/room_info")
 
-    # Variables d'état
-    # room_data = # Remplacer room_data = {} par :
+	# Variable pour stocker l'icône sélectionnée (état local)
+	state = {"selected_icon": ft.Icons.GROUPS}
 
-    # Avant le return, définissez l'icône d'en-tête
-    room_icon_display = ft.Icon(icon=ft.Icons.GROUPS, size=40, color=ft.Colors.ON_PRIMARY_CONTAINER)
-    room_name_display = ft.Text("Chargement...", size=24, weight="bold")
-    room_code_display = ft.Text("Public", size=12, color=ft.Colors.OUTLINE)
+	input_change = False
 
-    is_admin = False
+	# Avant le return, définissez l'icône d'en-tête
+	room_icon_display = ft.Icon(icon=ft.Icons.GROUPS, size=40, color=ft.Colors.ON_PRIMARY_CONTAINER)
+	room_name_display = ft.Text("Chargement...", size=24, weight="bold")
+	room_code_display = ft.Text("Public", size=12, color=ft.Colors.OUTLINE)
 
-    # Champs éditables
-    name_field = ft.TextField(label="Nom du salon", value="Chargement...", read_only=True, border=ft.InputBorder.UNDERLINE)
-    desc_field = ft.TextField(label="Description", value="Chargement...", read_only=True, multiline=True, border=ft.InputBorder.UNDERLINE)
-    code_field = ft.TextField(label="Code d'invitation", value="Chargement...", read_only=True, border=ft.InputBorder.UNDERLINE)
+	is_admin = False
 
-    # Bouton de sauvegarde (Caché par défaut)
-    save_btn = ft.ElevatedButton("Enregistrer les modifications", icon=ft.Icons.SAVE, visible=False)
+	btn_refresh = ft.IconButton(icon=ft.Icons.REFRESH, visible=False)
+	btn_copy = ft.IconButton(icon=ft.Icons.COPY, visible=False)  # On l'activera dans load_room_info
 
-    members_list = ft.ListView(spacing=5, padding=10, height=300)
+	room_avatar_container = ft.GestureDetector(content=ft.CircleAvatar(radius=50, content=room_icon_display, bgcolor=ft.Colors.PRIMARY_CONTAINER), on_tap=lambda e: page.run_task(handle_change_icon, e, is_admin))
 
-    async def load_room_info():
-        nonlocal is_admin
-        try:
-            cached_rooms_str = await storage.get("rooms_cache")
-            if cached_rooms_str:
-                rooms = json.loads(cached_rooms_str)
+	# Mettre le change input sur True
+	def change_input(e):
+		nonlocal input_change
+		if input_change:
+			return
+		input_change = True
+		name_field.on_change = None
+		desc_field.on_change = None
+		code_field.on_change = None
 
-            room_data = {}
-            for r in rooms:
-                if r["id"] == room_id:
-                    room_data = r
-                    break
+	# Champs éditables
+	name_field = ft.TextField(label="Nom du salon", value="Chargement...", read_only=True, expand=True, border=ft.InputBorder.UNDERLINE, on_change=change_input)
+	desc_field = ft.TextField(label="Description", value="Chargement...", read_only=True, expand=True, multiline=True, border=ft.InputBorder.UNDERLINE, on_change=change_input)
+	code_field = ft.TextField(label="Code d'invitation", value="Chargement...", read_only=True, expand=True, border=ft.InputBorder.UNDERLINE, suffix=ft.Row([btn_refresh, btn_copy], tight=True), on_change=change_input)
+	# Ajouter un bouton de rafraîchissement au code_field
 
-            if not room_data:
-                await show_top_toast(page, "Salon introuvable", True)
-                await page.push_route("/chat")
-                return
+	# --- FONCTION POUR GÉNÉRER UN NOUVEAU CODE ---
+	async def handle_refresh_code(e):
+		new_code = generate_secure_code()
+		code_field.value = new_code
+		page.update()
+		await show_top_toast(page, "Nouveau code généré (n'oubliez pas d'enregistrer)")
 
-            room_data = r
-            room_icon_display.icon = room_data.get("icon", ft.Icons.GROUPS)  # Utilise get par sécurité
-            room_name_display.value = room_data["name"]
-            if room_data["access_key"]:
-                room_code_display.value = f"Code : {room_data['access_key']}"
+	# Bouton de sauvegarde (Caché par défaut)
+	save_btn = ft.ElevatedButton("Enregistrer les modifications", icon=ft.Icons.SAVE, visible=False)
 
-            # Vérification Admin
-            if room_data["creator"]:
-                is_admin = str(room_data["creator"]["id"]) == str(current_user_id)
+	members_list = ft.ListView(spacing=5, padding=10, height=300)
 
-            # Remplissage de l'UI
-            name_field.value = room_data["name"]
-            desc_field.value = room_data["description"]
-            if room_data["access_key"]:
-                code_field.value = room_data["access_key"]
-                code_field.on_click = lambda e: page.run_task(copy_message, e, page, room_data["access_key"], "Clé d'accès copiée !")
-            else:
-                code_field.value = "Salon Public"
+	async def load_room_info():
+		nonlocal is_admin
+		try:
+			cached_rooms_str = await storage.get("rooms_cache")
+			if cached_rooms_str:
+				rooms = json.loads(cached_rooms_str)
 
-            if is_admin:
-                name_field.read_only = False
-                desc_field.read_only = False
-                save_btn.visible = True
+			room_data = {}
+			for r in rooms:
+				if r["id"] == room_id:
+					room_data = r
+					break
 
-            # Simulation d'affichage des membres (À relier à une route API qui liste les membres de la room)
-            members = [{"pseudo": "RapideRenard5"}, {"pseudo": "CalmeHibou42"}]  # Exemple
+			if not room_data:
+				await show_top_toast(page, "Salon introuvable", True)
+				await page.push_route("/chat")
+				return
 
-            members_list.controls.clear()
-            for m in members:
-                members_list.controls.append(
-                    ft.ListTile(
-                        leading=ft.CircleAvatar(content=ft.Text(get_initials(m["pseudo"])), bgcolor=get_avatar_color(m["pseudo"], COLORS_LOOKUP)),
-                        title=ft.Text(m["pseudo"], weight="bold"),
-                    )
-                )
-            page.update()
+			room_data = r
 
-        except httpx.RequestError:
-            await show_top_toast(page, "Erreur réseau !", True)
+			state["selected_icon"] = room_data.get("icon", ft.Icons.GROUPS)
+			room_icon_display.icon = state["selected_icon"]
 
-    async def save_changes(e):
-        try:
-            payload = {
-                "name": name_field.value,
-                "description": desc_field.value,
-            }
-            # Appel API selon ton main.py: PUT /rooms/{room_id}?user_id={id}
-            response = await api.put(f"/rooms/{room_id}", data=payload)
+			room_name_display.value = room_data["name"]
+			if room_data["access_key"]:
+				room_code_display.value = f"Code : {room_data['access_key']}"
 
-            if response.status_code == 200:
-                await show_top_toast(page, "Modifications enregistrées !")
-                page.session.store.set("current_room_name", name_field.value)
-                await refresh_rooms(page, storage)
-                page.run_task(load_room_info)
-            else:
-                await show_top_toast(page, response.json().get("detail", "Erreur lors de la modification"), True)
-        except Exception as ex:
-            await show_top_toast(page, "Erreur réseau", True)
+			# Vérification Admin
+			if room_data["creator"]:
+				is_admin = str(room_data["creator"]["id"]) == str(current_user_id)
 
-    save_btn.on_click = save_changes
+			# Remplissage de l'UI
+			name_field.value = room_data["name"]
+			desc_field.value = room_data["description"]
+			if room_data["access_key"]:
+				code_field.value = room_data["access_key"]
+				# code_field.on_click = lambda e: page.run_task(copy_message, e, page, room_data["access_key"], "Clé d'accès copiée !")
+			else:
+				code_field.value = "Salon Public"
 
-    # Déclenchement du chargement
-    page.run_task(load_room_info)
+			if is_admin:
+				name_field.read_only = False
+				desc_field.read_only = False
+				save_btn.visible = True
+				btn_refresh.visible = True
+				btn_refresh.on_click = handle_refresh_code
+				btn_copy.visible = True
+				btn_copy.on_click = lambda e: page.run_task(copy_message, e, page, code_field.value, "Code copié !")
+				# room_name_display.spans = [ft.TextSpan(" (Cliquer sur l'icône pour changer)", style=ft.TextStyle(size=10, color=ft.Colors.OUTLINE))]
+			# Simulation d'affichage des membres (À relier à une route API qui liste les membres de la room)
+			members = [{"pseudo": "RapideRenard5"}, {"pseudo": "CalmeHibou42"}]  # Exemple
 
-    return ft.View(
-        route=f"/room_info/{room_id}",
-        appbar=ft.AppBar(
-            leading=ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, on_click=lambda _: page.run_task(page.push_route, "/chat")),
-            title=ft.Text("Détails du salon", weight="bold"),
-            bgcolor="surface",
-            center_title=True,
-        ),
-        controls=[
-            ft.Container(
-                content=ft.Column(
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    controls=[
-                        # En-tête avec Avatar et Nom
-                        ft.Container(height=20),
-                        ft.CircleAvatar(radius=50, content=room_icon_display, bgcolor=ft.Colors.PRIMARY_CONTAINER),
-                        room_name_display,
-                        room_code_display,
-                        ft.Divider(height=30, color=ft.Colors.TRANSPARENT),
-                        # Formulaire (dans un Container pour limiter la largeur sur PC/Tablette)
-                        ft.Container(
-                            content=ft.Column(
-                                [
-                                    name_field,
-                                    desc_field,
-                                    code_field,
-                                    ft.Container(content=save_btn, alignment=ft.Alignment.CENTER, margin=ft.margin.only(top=15, bottom=15)),
-                                ]
-                            ),
-                            padding=ft.padding.symmetric(horizontal=20),
-                        ),
-                        # Section Membres
-                        ft.Container(
-                            content=ft.Column(
-                                [
-                                    ft.Row(
-                                        [
-                                            ft.Text("Membres", size=18, weight="bold"),
-                                            ft.Text("En ligne", size=12, color=ft.Colors.GREEN_500),
-                                        ],
-                                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                                    ),
-                                    ft.Container(content=members_list, bgcolor=ft.Colors.SURFACE_CONTAINER_LOW, border_radius=15, padding=5),
-                                ]
-                            ),
-                            padding=ft.padding.symmetric(horizontal=20),
-                        ),
-                    ],
-                    scroll=ft.ScrollMode.AUTO,
-                ),
-                expand=True,
-            )
-        ],
-    )
+			members_list.controls.clear()
+			for m in members:
+				members_list.controls.append(
+					ft.ListTile(
+						leading=ft.CircleAvatar(
+							content=ft.Text(get_initials(m["pseudo"])),
+							bgcolor=get_avatar_color(m["pseudo"], COLORS_LOOKUP),
+						),
+						title=ft.Text(m["pseudo"], weight="bold"),
+					)
+				)
+			page.update()
+
+		except httpx.RequestError:
+			await show_top_toast(page, "Erreur réseau !", True)
+
+	# --- FONCTION POUR CHANGER L'ICÔNE ---
+	def update_icon_state(icon_name):
+		state["selected_icon"] = icon_name
+
+	async def handle_change_icon(e, is_admin):
+		nonlocal input_change
+		if is_admin:
+			await select_icon_dialog(page, room_icon_display, update_icon_state)
+			input_change = True
+
+	async def save_changes(e):
+		nonlocal input_change
+		if not input_change:
+			await show_top_toast(page, "Aucune modification à enregistrer")
+			return
+		try:
+			payload = {"name": name_field.value, "description": desc_field.value, "icon": state["selected_icon"], "access_key": code_field.value}
+			# Appel API selon ton main.py: PUT /rooms/{room_id}?user_id={id}
+			response = await api.put(f"/rooms/{room_id}", data=payload)
+
+			if response.status_code == 200:
+				await show_top_toast(page, "Modifications enregistrées !")
+				page.session.store.set("current_room_name", name_field.value)
+				room_name_display = (name_field.value,)
+				await refresh_rooms(page, storage)
+				page.run_task(load_room_info)
+
+				# On réinitialise la variable input_change
+				input_change = False
+				name_field.on_change = change_input
+				desc_field.on_change = change_input
+				code_field.on_change = change_input
+			else:
+				await show_top_toast(page, response.json().get("detail", "Erreur lors de la modification"), True)
+		except Exception as ex:
+			await show_top_toast(page, "Erreur réseau", True)
+
+	save_btn.on_click = save_changes
+
+	# Déclenchement du chargement
+	page.run_task(load_room_info)
+
+	return ft.View(
+		route=f"/room_info/{room_id}",
+		appbar=ft.AppBar(
+			leading=ft.IconButton(
+				ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED,
+				on_click=lambda _: page.run_task(page.push_route, "/chat"),
+			),
+			title=ft.Text("Détails du salon", weight="bold"),
+			bgcolor="surface",
+			center_title=True,
+		),
+		controls=[
+			ft.Container(
+				content=ft.Column(
+					horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+					controls=[
+						# En-tête avec Avatar et Nom
+						ft.Container(height=20),
+						room_avatar_container,
+						room_name_display,
+						room_code_display,
+						ft.Divider(height=30, color=ft.Colors.TRANSPARENT),
+						# Formulaire (dans un Container pour limiter la largeur sur PC/Tablette)
+						ft.Container(
+							content=ft.Column(
+								[
+									name_field,
+									desc_field,
+									code_field,
+									ft.Container(
+										content=save_btn,
+										alignment=ft.Alignment.CENTER,
+										margin=ft.margin.only(top=15, bottom=15),
+									),
+								],
+								# horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+							),
+							padding=ft.padding.symmetric(horizontal=20),
+						),
+						# Section Membres
+						ft.Container(
+							content=ft.Column(
+								[
+									ft.Row(
+										[
+											ft.Text("Membres", size=18, weight="bold"),
+											ft.Text("En ligne", size=12, color=ft.Colors.GREEN_500),
+										],
+										alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+									),
+									ft.Container(
+										content=members_list,
+										bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
+										border_radius=15,
+										padding=5,
+									),
+								]
+							),
+							padding=ft.padding.symmetric(horizontal=20),
+						),
+					],
+					scroll=ft.ScrollMode.AUTO,
+				),
+				expand=True,
+			)
+		],
+	)
