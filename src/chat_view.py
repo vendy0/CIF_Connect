@@ -431,13 +431,14 @@ async def ChatView(page: ft.Page):
 					new_msg = Message(id=msg_data["id"], pseudo=msg_data["author_display_name"], content=msg_data["content"], message_type=msg_data["message_type"], modified=msg_data["modified"], parent_id=msg_data["parent_id"], message_datetime=message_datetime, message_date=message_datetime.date(), message_time=message_datetime.time(), reactions=reactions_counts)
 
 					# Vérification doublon
-					existing_ids = [m.content[0].key for m in chat_list.controls if hasattr(m.content[0], "key")]
+				# 	existing_ids = [m.content[0].key for m in chat_list.controls if hasattr(m.content[0], "key")]
+					existing_ids = [str(m.message.id) for m in chat_list.controls if hasattr(m, "message")]
 					if str(new_msg.id) not in existing_ids:
 						is_me = new_msg.pseudo == current_pseudo
 						on_message(new_msg, is_me)
 
 						page.update()
-						chat_list.scroll_to(offset=-1, duration=300)
+						await chat_list.scroll_to(offset=-1, duration=300)
 						page.update()
 
 		except websockets.exceptions.ConnectionClosed:
