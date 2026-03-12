@@ -17,4 +17,4 @@ def spaces_to_tabs(file_path):
 
 
 # utilisation
-spaces_to_tabs("src/chat_view.py")
+spaces_to_tabs("src/chat/dialogs.py")

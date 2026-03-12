@@ -5,7 +5,7 @@ from datetime import datetime, date, time, timedelta
 import httpx
 from chat.components import MyChatMessage, OtherChatMessage, SystemMessage
 from chat.models import Message
-from chat.api import fetch_room_messages, put_message, post_reaction, post_report, delete_message_bdd, post_message, post_quit_room
+from chat.api import fetch_room_messages, post_reaction, post_message
 from chat.dialogs import show_edit_dialog, show_delete_dialog, show_report_dialog, show_quit_dialog
 from utils import get_initials, get_avatar_color, get_colors, show_top_toast, format_date, copy_message
 import json
@@ -243,13 +243,15 @@ async def ChatView(page: ft.Page):
 		if not new_message.value.strip():
 			return
 
+		new_message.on_click = None
+
 		# await ft.Clipboard().set(value=new_message.value.strip())
 
 		parent_id = replying_to_message.id if replying_to_message else None
-
 		await cancel_reply(None)
 
 		message = await post_message(page, current_room_id, parent_id, new_message)
+		new_message.on_click = send_click
 		if not message:
 			return
 
@@ -298,8 +300,8 @@ async def ChatView(page: ft.Page):
 				# Plus besoin de boucler ! Le backend fournit déjà ces infos
 				parent = message_to_show.get("parent")
 				if parent:
-					parent_content=parent.get("content")
-					parent_author=parent.get("author_display_name")
+					parent_content = parent.get("content")
+					parent_author = parent.get("author_display_name")
 
 				if parent_id and not parent_content:
 					parent_content = "Message supprimé !"
