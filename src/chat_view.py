@@ -477,6 +477,18 @@ async def ChatView(page: ft.Page):
 						message_datetime = datetime.strptime(msg_data["created_at"], "%Y-%m-%dT%H:%M:%S")
 						for i in msg_data:
 							print(f"{i} : {msg_data.get(i)}")
+							
+						parent_id = msg_data.get("parent_id")
+		
+						# Plus besoin de boucler ! Le backend fournit déjà ces infos
+						parent = msg_data.get("parent")
+						if parent:
+							parent_content = parent.get("content")
+							parent_author = parent.get("author_display_name")
+		
+						if parent_id and not parent_content:
+							parent_content = "Message supprimé !"
+							parent_author = "Auteur supprimé !"
 
 						new_msg = Message(
 							id=msg_data["id"],
@@ -484,9 +496,9 @@ async def ChatView(page: ft.Page):
 							content=msg_data["content"],
 							message_type=msg_data["message_type"],
 							modified=msg_data.get("modified", False),
-							parent_id=msg_data.get("parent_id"),
-							parent_content=msg_data.get("parent_content"),  # <-- AJOUT VITAL
-							parent_author=msg_data.get("parent_author"),  # <-- AJOUT VITAL
+							parent_id=parent_id,
+							parent_content=parent_content,
+							parent_author=parent_author,
 							message_datetime=message_datetime,
 							message_date=message_datetime.date(),
 							message_time=message_datetime.time(),
