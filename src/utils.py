@@ -264,6 +264,7 @@ class Room:
 			subtitle_text = f"~{last_msg_author}: {last_msg_content}"
 		else:
 			subtitle_text = last_msg_content
+			
 
 		# Rendre le badge dynamique
 		unread_badge = ft.Container(
@@ -278,7 +279,7 @@ class Room:
 			key=str(self.id),
 			leading=ft.Icon(icon=self.icon, color=ft.Colors.BLUE_600),
 			title=ft.Text(self.name, weight="bold"),
-			subtitle=ft.Text(subtitle_text, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),  # Tronquer si trop long
+			subtitle=ft.Text(subtitle_text, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, color =ft.Colors.GREEN_500 if unread_count > 0 else None),  # Tronquer si trop long
 			data=self.id,
 			on_click=self.join_room,
 			trailing=ft.Column(
