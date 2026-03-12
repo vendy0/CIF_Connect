@@ -6,6 +6,9 @@ async def show_edit_dialog(page, msg, on_success):
     edit_input = ft.TextField(value=msg.content, multiline=True, expand=True, autofocus=True)
 
     async def save_click(e):
+        if not edit_input.value.strip():
+            edit_input.error = "Le champ est vide"
+            return
         if msg.content == edit_input.value.strip():
             page.pop_dialog()
             return
@@ -22,7 +25,8 @@ async def show_edit_dialog(page, msg, on_success):
             ft.FilledButton("Enregistrer", on_click=save_click),
         ],
     )
-    await page.show_dialog(dialog)
+    page.show_dialog(dialog)
+
 
 
 async def show_delete_dialog(page, msg_id, on_success):

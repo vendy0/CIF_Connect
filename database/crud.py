@@ -574,7 +574,7 @@ def delete_message_func(db: Session, message_id: int, user_id: int):
 		message.message_type = "delete"
 		db.add(message)
 		db.commit()
-		return {"detail": "Message supprimé", "message_id": message_id}
+		return message
 	except Exception as e:
 		db.rollback()
 		print(f"Erreur delete_message: {e}")

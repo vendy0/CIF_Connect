@@ -5,7 +5,7 @@ from typing import List
 from websocket_manager import manager
 
 # Import des modules locaux
-from database.models import SessionLocal
+from database.models import SessionLocal, Message
 import database.crud as db_inter
 from database.shemas import *
 from security import create_access_token, verify_password, SECRET_KEY, ALGORITHM
@@ -26,35 +26,35 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
-	try:
-		# 1. On tente de décoder le jeton avec notre SECRET_KEY
-		payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-		user_id: str = payload.get("sub")
+    try:
+        # 1. On tente de décoder le jeton avec notre SECRET_KEY
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
 
-		if user_id is None:
-			raise credentials_exception
-		try:
-			user_id = int(user_id)
-		except:
-			raise credentials_exception
-			return None
+        if user_id is None:
+            raise credentials_exception
+        try:
+            user_id = int(user_id)
+        except:
+            raise credentials_exception
+            return None
 
-		return user_id  # On retourne l'ID pour que la route sache qui appelle
-	except JWTError as e:
-		print(e)
-		# Si le jeton est expiré ou falsifié, on lève une erreur 401
-		raise HTTPException(
-			status_code=status.HTTP_401_UNAUTHORIZED,
-			detail="Jeton invalide ou expiré",
-		)
+        return user_id  # On retourne l'ID pour que la route sache qui appelle
+    except JWTError as e:
+        print(e)
+        # Si le jeton est expiré ou falsifié, on lève une erreur 401
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Jeton invalide ou expiré",
+        )
 
 
 def get_db():
-	db = SessionLocal()
-	try:
-		yield db
-	finally:
-		db.close()
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 # ==============================================================================
@@ -64,47 +64,47 @@ def get_db():
 
 @app.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED, tags=["Users"])
 def register(data: RegisterRequest, db: Session = Depends(get_db)):
-	"""Crée un nouvel utilisateur"""
-	user = db_inter.new_user(db, data)
-	access_token = create_access_token(data={"sub": str(user.id), "pseudo": user.pseudo, "role": user.role, "email": user.email})
-	return {"access_token": access_token, "token_type": "bearer"}
+    """Crée un nouvel utilisateur"""
+    user = db_inter.new_user(db, data)
+    access_token = create_access_token(data={"sub": str(user.id), "pseudo": user.pseudo, "role": user.role, "email": user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @app.post("/login", response_model=Token, tags=["Users"])
 def login(data: LoginRequest, db: Session = Depends(get_db)):
-	"""Authentification simple (Email + Password)"""
-	user = db_inter.get_user_by_email(db, data.email)
+    """Authentification simple (Email + Password)"""
+    user = db_inter.get_user_by_email(db, data.email)
 
-	# Vérification (Attention: MDP en clair ici, à hasfer en prod !)
-	if not user:
-		raise HTTPException(status_code=401, detail="Utilisateur introuvable !")
-	elif not verify_password(data.password, user.password):
-		raise HTTPException(status_code=401, detail="Mot de passe incorrect !")
+    # Vérification (Attention: MDP en clair ici, à hasfer en prod !)
+    if not user:
+        raise HTTPException(status_code=401, detail="Utilisateur introuvable !")
+    elif not verify_password(data.password, user.password):
+        raise HTTPException(status_code=401, detail="Mot de passe incorrect !")
 
-	if user.is_banned:
-		raise HTTPException(status_code=403, detail="Compte banni.")
-	# ... après avoir vérifié que l'utilisateur existe et que le MDP est bon ...
-	access_token = create_access_token(data={"sub": str(user.id), "pseudo": user.pseudo, "role": user.role, "email": user.email})
-	return {"access_token": access_token, "token_type": "bearer"}
+    if user.is_banned:
+        raise HTTPException(status_code=403, detail="Compte banni.")
+    # ... après avoir vérifié que l'utilisateur existe et que le MDP est bon ...
+    access_token = create_access_token(data={"sub": str(user.id), "pseudo": user.pseudo, "role": user.role, "email": user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @app.get("/users", response_model=List[UserSchema], tags=["Users"])
 def list_all_users(db: Session = Depends(get_db)):
-	"""Admin only: Liste tous les utilisateurs"""
-	return db_inter.get_all_users(db)
+    """Admin only: Liste tous les utilisateurs"""
+    return db_inter.get_all_users(db)
 
 
 @app.put("/users/pseudo", tags=["Users"])
 def change_pseudo(
-	data: PseudoUpdateRequest,
-	current_user_id: int = Depends(get_current_user),
-	db: Session = Depends(get_db),
+    data: PseudoUpdateRequest,
+    current_user_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-	"""Changer son pseudo"""
-	user = db_inter.update_user_pseudo(db, current_user_id, data.new_pseudo)
-	if not user:
-		raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-	return {"detail": "Pseudo modifié", "new_pseudo": user.pseudo}
+    """Changer son pseudo"""
+    user = db_inter.update_user_pseudo(db, current_user_id, data.new_pseudo)
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    return {"detail": "Pseudo modifié", "new_pseudo": user.pseudo}
 
 
 # ==============================================================================
@@ -114,63 +114,63 @@ def change_pseudo(
 
 @app.get("/rooms", response_model=List[RoomSchema], tags=["Rooms"])
 def list_rooms(
-	db: Session = Depends(get_db),
-	current_user_id: int = Depends(get_current_user),  # Le verrou est ici !
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(get_current_user),  # Le verrou est ici !
 ):
-	"""Liste publique des salons"""
-	# Logique pour chercher les salons en base de données
-	return db_inter.get_all_rooms(db)
+    """Liste publique des salons"""
+    # Logique pour chercher les salons en base de données
+    return db_inter.get_all_rooms(db)
 
 
 @app.post("/rooms", response_model=RoomSchema, status_code=status.HTTP_201_CREATED, tags=["Rooms"])
 def create_room(
-	data: CreateRoomSchema,
-	creator_id: int = Depends(get_current_user),
-	db: Session = Depends(get_db),
+    data: CreateRoomSchema,
+    creator_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-	"""Créer un nouveau salon"""
-	# L'ID du créateur est dans le body (data.creator_id)
-	return db_inter.create_room(db, data, creator_id=creator_id)
+    """Créer un nouveau salon"""
+    # L'ID du créateur est dans le body (data.creator_id)
+    return db_inter.create_room(db, data, creator_id=creator_id)
 
 
 @app.put("/rooms/{room_id}", response_model=RoomSchema, tags=["Rooms"])
 def update_room_info(room_id: int, update_data: RoomUpdateSchema, user_id: int = Depends(get_current_user), db: Session = Depends(get_db)):
-	"""
-	Modifier un salon (Nom, description, icône).
-	Seul le créateur peut le faire.
-	"""
-	return db_inter.update_room(db, room_id, user_id, update_data)
+    """
+    Modifier un salon (Nom, description, icône).
+    Seul le créateur peut le faire.
+    """
+    return db_inter.update_room(db, room_id, user_id, update_data)
 
 
 @app.delete("/rooms/{room_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Rooms"])
 def delete_room(room_id: int, user_id: int = Depends(get_current_user), db: Session = Depends(get_db)):
-	"""
-	Supprimer définitivement un salon.
-	Seul le créateur peut le faire.
-	"""
-	return db_inter.delete_room_func(db, room_id, user_id)
+    """
+    Supprimer définitivement un salon.
+    Seul le créateur peut le faire.
+    """
+    return db_inter.delete_room_func(db, room_id, user_id)
 
 
 @app.get("/user/rooms", response_model=List[RoomSchema], tags=["Rooms"])
 def get_my_rooms(db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user)):
-	"""Récupère les salons d'un utilisateur spécifique"""
-	return db_inter.get_user_rooms(db, current_user_id)
+    """Récupère les salons d'un utilisateur spécifique"""
+    return db_inter.get_user_rooms(db, current_user_id)
 
 
 @app.post("/user/rooms/join", response_model=RoomSchema, tags=["Rooms"])
 def join_room(
-	data: JoinRoomSchema,
-	db: Session = Depends(get_db),
-	current_user_id: int = Depends(get_current_user),
+    data: JoinRoomSchema,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(get_current_user),
 ):
-	"""Rejoindre un salon existant"""
-	return db_inter.join_new_room(db, data, current_user_id)
+    """Rejoindre un salon existant"""
+    return db_inter.join_new_room(db, data, current_user_id)
 
 
 @app.post("/user/rooms/{room_id}/quit", tags=["Rooms"], status_code=status.HTTP_204_NO_CONTENT)
 def quit_room(room_id: int, user_id: int = Depends(get_current_user), db: Session = Depends(get_db)):
-	"""Quitter un salon"""
-	return db_inter.quit_room_func(db, user_id=user_id, room_id=room_id)
+    """Quitter un salon"""
+    return db_inter.quit_room_func(db, user_id=user_id, room_id=room_id)
 
 
 # ==============================================================================
@@ -180,56 +180,70 @@ def quit_room(room_id: int, user_id: int = Depends(get_current_user), db: Sessio
 
 @app.get("/room/{room_id}/messages", response_model=List[MessageSchema], tags=["Messages"])
 def read_messages(room_id: int, current_user_id: int = Depends(get_current_user), db: Session = Depends(get_db)):
-	"""Lire l'historique d'un salon. Si l'utilisateur n'est pas dans le salon on restreind l'accès."""
-	return db_inter.get_messages(db, room_id, current_user_id)
+    """Lire l'historique d'un salon. Si l'utilisateur n'est pas dans le salon on restreind l'accès."""
+    return db_inter.get_messages(db, room_id, current_user_id)
 
 
 @app.post(
-	"/room/{room_id}/messages",
-	response_model=MessageSchema,
-	status_code=status.HTTP_201_CREATED,
-	tags=["Messages"],
+    "/room/{room_id}/messages",
+    response_model=MessageSchema,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Messages"],
 )
 async def send_message(
-	room_id: int,
-	message_data: MessageCreate,
-	db: Session = Depends(get_db),
-	current_user_id: int = Depends(get_current_user),
+    room_id: int,
+    message_data: MessageCreate,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(get_current_user),
 ):
-	"""Poster un message dans un salon"""
-	# 1. Sauvegarde en base de données
-	new_msg = db_inter.create_message(db, room_id, message_data, current_user_id)
+    """Poster un message dans un salon"""
+    # 1. Sauvegarde en base de données
+    new_msg = db_inter.create_message(db, room_id, message_data, current_user_id)
 
-	# 2. Conversion en dictionnaire pour le JSON
-	msg_dict = MessageSchema.model_validate(new_msg).model_dump(mode="json")
+    # 2. Conversion en dictionnaire pour le JSON
+    msg_dict = MessageSchema.model_validate(new_msg).model_dump(mode="json")
 
-	# 3. Diffusion immédiate aux autres élèves du salon
-	await manager.broadcast_to_room(room_id, msg_dict)
+    # 3. Diffusion immédiate aux autres élèves du salon
+    await manager.broadcast_to_room(room_id, msg_dict)
 
-	return new_msg
+    return new_msg
 
 
 @app.put("/message/{message_id}", tags=["Messages"])
-def edit_message(
-	message_id: int,
-	data: EditMessageSchema,
-	user_id: int = Depends(get_current_user),
-	db: Session = Depends(get_db),
+async def edit_message(
+    message_id: int,
+    data: EditMessageSchema,
+    user_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-	"""
-	Modifier un message.
-	Possible si on est l'auteur.
-	"""
-	return db_inter.edit_message_func(db, message_id, data, user_id)
+    """
+    Modifier un message.
+    Possible si on est l'auteur.
+    """
+    updated_msg = db_inter.edit_message_func(db, message_id, data, user_id)
+    # 2. Diffusion WebSocket avec action "edit"
+    msg_dict = MessageSchema.model_validate(updated_msg).model_dump(mode="json")
+    msg_dict["action"] = "edit"
+    await manager.broadcast_to_room(updated_msg.room_id, msg_dict)
+
+    return updated_msg
 
 
 @app.delete("/message/{message_id}", tags=["Messages"], status_code=status.HTTP_204_NO_CONTENT)
-def delete_message(message_id: int, user_id: int = Depends(get_current_user), db: Session = Depends(get_db)):
-	"""
-	Supprimer un message.
-	Possible si on est l'auteur.
-	"""
-	return db_inter.delete_message_func(db, message_id, user_id)
+async def delete_message(message_id: int, user_id: int = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Supprimer un message.
+    Possible si on est l'auteur.
+    """
+    msg = db_inter.delete_message_func(db, message_id, user_id)
+    if msg:
+        room_id = msg.room_id
+        # 2. Suppression BDD
+        db_inter.delete_message_func(db, message_id, user_id)
+
+        # 3. Diffusion WebSocket avec action "delete"
+        await manager.broadcast_to_room(room_id, {"action": "delete", "id": message_id})
+    return
 
 
 # ==============================================================================
@@ -238,23 +252,31 @@ def delete_message(message_id: int, user_id: int = Depends(get_current_user), db
 
 
 @app.post("/message/{message_id}/reaction", response_model=ReactionSchema, tags=["Reactions"])
-def add_reaction(
-	message_id: int,
-	reaction_data: ReactionCreateSchema,
-	user_id: int = Depends(get_current_user),
-	db: Session = Depends(get_db),
+async def add_reaction(
+    message_id: int,
+    reaction_data: ReactionCreateSchema,
+    user_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-	"""Ajouter un emoji à un message"""
-	return db_inter.reagir(db, message_id, reaction_data, user_id)
+    """Ajouter un emoji à un message"""
+    reaction = db_inter.reagir(db, message_id, reaction_data, user_id)
+    # 2. On récupère le message avec toutes ses nouvelles réactions
+    msg = db.query(Message).filter(Message.id == message_id).first()
+    if msg:
+        msg_dict = MessageSchema.model_validate(msg).model_dump(mode="json")
+        msg_dict["action"] = "react"
+        await manager.broadcast_to_room(msg.room_id, msg_dict)
+
+    return reaction
 
 
 @app.delete("/reaction/{reaction_id}", response_model=ReactionReturnSchema, tags=["Reactions"])
 def remove_reaction(reaction_id: int, user_id: int, db: Session = Depends(get_db)):
-	"""
-	Supprimer une réaction.
-	On demande user_id en query param pour vérifier que c'est bien l'auteur.
-	"""
-	return db_inter.dereagir(db, user_id, reaction_id)
+    """
+    Supprimer une réaction.
+    On demande user_id en query param pour vérifier que c'est bien l'auteur.
+    """
+    return db_inter.dereagir(db, user_id, reaction_id)
 
 
 # ==============================================================================
@@ -264,33 +286,33 @@ def remove_reaction(reaction_id: int, user_id: int, db: Session = Depends(get_db
 
 @app.post("/reports", response_model=ReportSchema, status_code=status.HTTP_201_CREATED, tags=["Reports"])
 def send_report(
-	data: ReportCreateSchema,
-	reporter_id: int = Depends(get_current_user),
-	db: Session = Depends(get_db),
+    data: ReportCreateSchema,
+    reporter_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-	"""
-	Créer un nouveau signalement.
-	Il suffit de donner l'ID du message et la raison.
-	"""
-	return db_inter.create_report(db, data, reporter_id)
+    """
+    Créer un nouveau signalement.
+    Il suffit de donner l'ID du message et la raison.
+    """
+    return db_inter.create_report(db, data, reporter_id)
 
 
 @app.get("/reports", response_model=List[ReportFullSchema], tags=["Reports"])
 def list_reports(db: Session = Depends(get_db)):
-	"""
-	(Admin) Voir tous les signalements.
-	"""
-	return db_inter.get_all_reports(db)
+    """
+    (Admin) Voir tous les signalements.
+    """
+    return db_inter.get_all_reports(db)
 
 
 @app.post("/reports/{report_id}/resolve", response_model=ReportSchema, tags=["Reports"])
 def resolve_report(report_id: int, resolution_data: ReportResolutionSchema, db: Session = Depends(get_db)):
-	"""
-	(Admin) Résoudre un signalement avec action optionnelle (Ban).
+    """
+    (Admin) Résoudre un signalement avec action optionnelle (Ban).
 
-	- status: 'resolved', 'dismissed', etc.
-	- ban_user: true/false
-	- ban_duration_hours: int (si vide = définitif)
-	"""
-	# Ici, tu devrais vérifier si l'user connecté est admin (via dépendance ou check manuel)
-	return db_inter.process_report_resolution(db, report_id, resolution_data)
+    - status: 'resolved', 'dismissed', etc.
+    - ban_user: true/false
+    - ban_duration_hours: int (si vide = définitif)
+    """
+    # Ici, tu devrais vérifier si l'user connecté est admin (via dépendance ou check manuel)
+    return db_inter.process_report_resolution(db, report_id, resolution_data)

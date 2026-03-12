@@ -19,7 +19,7 @@
 # - Désactiver l'auto scroll quand on remonte
 # - Ajouter la colonne last read dans la bdd
 # - Mettre les messages en fil d'attente
-
+# - Parent id fait des siennes
 
 
 
