@@ -49,6 +49,7 @@ user_room = Table(
 	Base.metadata,
 	Column("user_id", Integer, ForeignKey("users.id"), primary_key=True),
 	Column("room_id", Integer, ForeignKey("rooms.id"), primary_key=True),
+	Column("last_read_message_id", Integer, default=0, nullable=True),  # <-- Nouvelle colonne
 )
 
 # ==============================================================================
@@ -63,9 +64,7 @@ class User(Base):
 	email = Column(String, nullable=False, unique=True, index=True)
 	password = Column(String, nullable=False)
 	pseudo = Column(String, nullable=False, unique=True, index=True)
-	last_pseudo_update = Column(
-		DateTime, default=datetime.now().replace(microsecond=0), nullable=False
-	)
+	last_pseudo_update = Column(DateTime, default=datetime.now().replace(microsecond=0), nullable=False)
 	role = Column(String, default="eleve", nullable=False)
 
 	# Gestion Ban
@@ -78,18 +77,12 @@ class User(Base):
 	# --- Relations ---
 	created_rooms = relationship("Room", back_populates="creator")
 	rooms = relationship("Room", secondary=user_room, back_populates="users")
-	authored_messages = relationship(
-		"Message", back_populates="author", cascade="all, delete-orphan"
-	)
+	authored_messages = relationship("Message", back_populates="author", cascade="all, delete-orphan")
 	reactions = relationship("Reaction", back_populates="user", cascade="all, delete-orphan")
 
 	# Signalements
-	reports_sent = relationship(
-		"Report", back_populates="reporter", foreign_keys="Report.reporter_id"
-	)
-	reports_received = relationship(
-		"Report", back_populates="reported", foreign_keys="Report.reported_id"
-	)
+	reports_sent = relationship("Report", back_populates="reporter", foreign_keys="Report.reporter_id")
+	reports_received = relationship("Report", back_populates="reported", foreign_keys="Report.reported_id")
 
 
 class Room(Base):
@@ -103,8 +96,8 @@ class Room(Base):
 
 	created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
 	created_at = Column(DateTime, default=datetime.now().replace(microsecond=0), nullable=False)
-	
-	active = Column(Boolean, default=True, nullable = False)
+
+	active = Column(Boolean, default=True, nullable=False)
 	# --- Relations ---
 	creator = relationship("User", back_populates="created_rooms")
 	users = relationship("User", secondary=user_room, back_populates="rooms")
@@ -153,9 +146,7 @@ class Reaction(Base):
 	message = relationship("Message", back_populates="reactions")
 
 	__table_args__ = (
-		UniqueConstraint(
-			"user_id", "message_id", name="uix_user_message_reaction"
-		),  # Un seul emoji par msg par user ? À voir si tu veux autoriser plusieurs
+		UniqueConstraint("user_id", "message_id", name="uix_user_message_reaction"),  # Un seul emoji par msg par user ? À voir si tu veux autoriser plusieurs
 		Index("ix_reactions_message_id", "message_id"),
 	)
 

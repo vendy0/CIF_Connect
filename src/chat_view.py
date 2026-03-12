@@ -5,7 +5,7 @@ from datetime import datetime, date, time, timedelta
 import httpx
 from chat.components import MyChatMessage, OtherChatMessage, SystemMessage
 from chat.models import Message
-from chat.api import fetch_room_messages, post_reaction, post_message
+from chat.api import fetch_room_messages, post_reaction, post_message, mark_room_messages_as_read
 from chat.dialogs import show_edit_dialog, show_delete_dialog, show_report_dialog, show_quit_dialog
 from utils import get_initials, get_avatar_color, get_colors, show_top_toast, format_date, copy_message
 import json
@@ -21,6 +21,7 @@ import asyncio
 async def ChatView(page: ft.Page):
 	storage = ft.SharedPreferences()
 	token = await storage.get("cif_token")
+	last_date = None
 
 	def build_empty_chat_view():
 		return ft.Container(
@@ -282,8 +283,8 @@ async def ChatView(page: ft.Page):
 		page.update()
 
 	async def show_messages(messages_received, first_load=False):
-		nonlocal chat_list
-		last_date = None
+		nonlocal chat_list, last_date, current_room_id
+		last_message_id = None
 		# On affiche les messages
 		if messages_received:
 			if isinstance(messages_received, dict):
@@ -354,6 +355,8 @@ async def ChatView(page: ft.Page):
 					last_date = message_date
 				is_me = me.pseudo == current_pseudo
 				on_message(me, is_me)
+				last_message_id = me.id
+			await mark_room_messages_as_read(page, current_room_id, last_message_id)
 			page.update()
 			# await chat_list.scroll_to(offset=-1, duration=100)
 			# On affiche le message
@@ -428,6 +431,7 @@ async def ChatView(page: ft.Page):
 	ws_connection = None
 
 	async def listen_ws():
+		nonlocal current_room_id
 		nonlocal ws_connection
 		ws_url = f"ws://127.0.0.1:8000/ws/{current_room_id}"
 
@@ -475,20 +479,6 @@ async def ChatView(page: ft.Page):
 							reactions_counts[emj] = reactions_counts.get(emj, 0) + 1
 
 						message_datetime = datetime.strptime(msg_data["created_at"], "%Y-%m-%dT%H:%M:%S")
-						for i in msg_data:
-							print(f"{i} : {msg_data.get(i)}")
-
-						# parent_id = msg_data.get("parent_id")
-
-						# # Plus besoin de boucler ! Le backend fournit déjà ces infos
-						# parent = msg_data.get("parent")
-						# if parent:
-						# 	parent_content = parent.get("content")
-						# 	parent_author = parent.get("author_display_name")
-
-						# if parent_id and not parent_content:
-						# 	parent_content = "Message supprimé !"
-						# 	parent_author = "Auteur supprimé !"
 
 						new_msg = Message(
 							id=msg_data["id"],
@@ -511,6 +501,7 @@ async def ChatView(page: ft.Page):
 						if str(new_msg.id) not in existing_ids:
 							is_me = new_msg.pseudo == current_pseudo
 							on_message(new_msg, is_me)
+							await mark_room_messages_as_read(page, current_room_id, new_msg.id)
 					page.update()
 
 		except websockets.exceptions.ConnectionClosed:

@@ -149,6 +149,19 @@ async def RoomInfoView(page: ft.Page):
 			if room_data["creator"]:
 				is_admin = str(room_data["creator"]["id"]) == str(current_user_id)
 
+			try:
+				online_res = await api.get(f"/rooms/{room_id}/online")
+				if online_res.status_code == 200:
+					online_members = online_res.json().get("online_members", 0)
+					total_members = online_res.json().get("total_members", "?")  # Si tu as le total via l'API
+
+					# Mise à jour du composant texte
+					members_info_row.controls[1].value = f"{online_members} / {total_members} membres en ligne"
+					page.update()
+			except Exception as e:
+				await show_top_toast(page, "Erreur chargement membres en ligne", True)
+				print(f"Erreur chargement membres en ligne: {e}")
+
 			# Remplissage de l'UI
 			name_field.value = room_data["name"]
 			desc_field.value = room_data["description"]
@@ -167,13 +180,6 @@ async def RoomInfoView(page: ft.Page):
 				btn_copy.visible = True
 				btn_copy.on_click = lambda e: page.run_task(copy_message, e, page, code_field.value, "Code copié !")
 				delete_btn.visible = True
-
-				# Exemple de ce que tu mettras dans ta fonction de chargement :
-				total_members = room_data.get("total_members", 0)
-				online_members = room_data.get("online_members", 0)
-
-				# Mise à jour du texte (c'est le 2ème contrôle dans le Row)
-				members_info_row.controls[1].value = f"{online_members} / {total_members} membres en ligne"
 
 			page.update()
 

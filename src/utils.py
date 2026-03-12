@@ -42,7 +42,7 @@ async def view_pop(view, page):
 
 # Filtrer proprement (garde uniquement les icônes réellement exposées par ft.Icons)
 
-raw = [
+icons = [
 	"MESSAGE",
 	"GROUPS",
 	"SCHOOL",
@@ -184,11 +184,15 @@ raw = [
 	"NO_ADULT_CONTENT",
 	"PRIVACY_TIP",
 	"LOCK_PERSON",
-	"VOLCANO","INCOGNITO","VISIBILITY_OFF","FINGERPRINT","SHIELD_MOON"
+	"VOLCANO",
+	"INCOGNITO",
+	"VISIBILITY_OFF",
+	"FINGERPRINT",
+	"SHIELD_MOON",
 ]
 
 # AVAILABLE_ICONS contient alors seulement les icons valides sur ta install (0.80.5)
-AVAILABLE_ICONS = [getattr(ft.Icons, n) for n in raw if hasattr(ft.Icons, n)]
+AVAILABLE_ICONS = [getattr(ft.Icons, n) for n in icons if hasattr(ft.Icons, n)]
 
 
 async def select_icon_dialog(page: ft.Page, current_icon_control: ft.Icon, on_select_callback=None):
@@ -248,27 +252,38 @@ unread_badge = ft.Container(
 )
 
 
-# Assurez-vous que les fichiers json sont dans le même dossier ou ajustez le cheminimport json
 class Room:
-	def __init__(self, page, room_id, name, description, icon=ft.Icons.CHAT_BUBBLE_ROUNDED, code="ab12"):
+	def __init__(self, page, room_id, name, last_msg_content, last_msg_author, last_msg_time, unread_count, icon=ft.Icons.CHAT_BUBBLE_ROUNDED):
 		self.page = page
-		self.id: int = room_id
-		self.name: str = name
-		self.description: str = description
-		self.icon: ft.Icons = icon
-		self.code: str = code
+		self.id = room_id
+		self.name = name
+		self.icon = icon
+
+		# Formater le sous-titre (Style WhatsApp)
+		if last_msg_author:
+			subtitle_text = f"~{last_msg_author}: {last_msg_content}"
+		else:
+			subtitle_text = last_msg_content
+
+		# Rendre le badge dynamique
+		unread_badge = ft.Container(
+			content=ft.Text(str(unread_count), size=10, color=ft.Colors.WHITE, weight="bold"),
+			bgcolor=ft.Colors.GREEN_500,
+			border_radius=10,
+			padding=ft.padding.symmetric(horizontal=6, vertical=2),
+			visible=unread_count > 0,  # Caché si 0 non-lu
+		)
 
 		self.controls = ft.ListTile(
 			key=str(self.id),
 			leading=ft.Icon(icon=self.icon, color=ft.Colors.BLUE_600),
 			title=ft.Text(self.name, weight="bold"),
-			subtitle=ft.Text(self.description),
-			# trailing=ft.Icon(ft.Icons.CHEVRON_RIGHT),
+			subtitle=ft.Text(subtitle_text, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),  # Tronquer si trop long
 			data=self.id,
 			on_click=self.join_room,
 			trailing=ft.Column(
 				[
-					ft.Text("10:37", size=10, color=ft.Colors.ON_SURFACE_VARIANT),  # Heure du dernier msg
+					ft.Text(last_msg_time or "", size=10, color=ft.Colors.ON_SURFACE_VARIANT),
 					unread_badge,
 				],
 				alignment=ft.MainAxisAlignment.CENTER,

@@ -2,6 +2,7 @@ import flet as ft
 import httpx
 from utils import Room, api, show_top_toast
 import json
+import websockets
 
 
 async def RoomsView(page: ft.Page):
@@ -87,12 +88,26 @@ async def RoomsView(page: ft.Page):
 			room_list.controls.clear()
 			room_list.controls.append(info_text)
 
+			# for r in data:
+			# 	new_room_obj = Room(
+			# 		page=page,
+			# 		room_id=r["id"],
+			# 		name=r["name"],
+			# 		description=r["description"],
+			# 		icon=r["icon"],
+			# 	)
+			# 	room_list.controls.append(new_room_obj.controls)
+			# 	room_list.controls.append(ft.Divider(height=2))
+
 			for r in data:
 				new_room_obj = Room(
 					page=page,
 					room_id=r["id"],
 					name=r["name"],
-					description=r["description"],
+					last_msg_content=r.get("last_message_content", ""),
+					last_msg_author=r.get("last_message_author", ""),
+					last_msg_time=r.get("last_message_time", ""),
+					unread_count=r.get("unread_count", 0),
 					icon=r["icon"],
 				)
 				room_list.controls.append(new_room_obj.controls)
@@ -106,6 +121,28 @@ async def RoomsView(page: ft.Page):
 			await show_top_toast(page, "Erreur réseau !", True)
 
 	page.run_task(load_rooms)
+
+	async def listen_global_updates():
+		current_user_id = await storage.get("user_id")
+		if not current_user_id:
+			return
+
+		# Ce WebSocket doit être créé côté serveur (ex: /ws/user/{user_id})
+		# Il enverra un simple message "update" quand l'utilisateur reçoit un message
+		ws_url = f"ws://127.0.0.1:8000/ws/user/{current_user_id}"
+
+		try:
+			async with websockets.connect(ws_url) as ws:
+				async for data in ws:
+					# Dès qu'une notification serveur arrive, on rafraîchit la liste des salons en tâche de fond
+					page.run_task(load_rooms)
+		except websockets.exceptions.ConnectionClosed:
+			print("WS global fermé")
+		except Exception:
+			pass  # Gérer la reconnexion si nécessaire
+
+	# Lancer l'écoute sans bloquer la vue
+	page.run_task(listen_global_updates)
 
 	return ft.View(
 		route="/rooms",

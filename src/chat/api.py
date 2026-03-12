@@ -26,6 +26,22 @@ async def fetch_room_messages(page, room_id):
 		return None
 
 
+async def mark_room_messages_as_read(page, room_id, last_message_id):
+	"""
+	Informe le serveur que l'utilisateur a lu les messages de ce salon jusqu'à cet ID.
+	"""
+	if not last_message_id:
+		return
+
+	try:
+		# L'API FastAPI attend last_message_id comme paramètre de requête (query parameter)
+		response = await api.post(f"/user/rooms/{room_id}/read?last_message_id={last_message_id}")
+		return response.status_code == 200
+	except httpx.RequestError:
+		# On échoue silencieusement pour ne pas spammer l'utilisateur d'erreurs réseau pour un simple "vu"
+		return False
+
+
 async def put_message(page, edit_message_input, msg):
 	try:
 		response = await api.put(f"/message/{msg.id}", data={"content": msg.content})

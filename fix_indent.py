@@ -17,4 +17,5 @@ def spaces_to_tabs(file_path):
 
 
 # utilisation
-spaces_to_tabs("src/chat/dialogs.py")
+path = input("Chemin : ")
+spaces_to_tabs(path)
