@@ -6,6 +6,7 @@ from datetime import datetime, date, time
 # 1. MODÈLES DE DONNÉES
 # =============================================================================
 
+
 @dataclass
 class Message:
     id: int

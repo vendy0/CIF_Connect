@@ -74,32 +74,34 @@ class BaseChatMessage(ft.Row):
 
         # 1. Message Parent (Reply) - Full Width (Style WhatsApp)
         if self.message.parent_content and self.message.parent_author:
-            self.parent_bubble = ft.Container(
-                content=ft.Column(
-                    [
-                        ft.Text(
-                            self.message.parent_author,
-                            size=11,
-                            weight="bold",
-                            color=ft.Colors.PRIMARY,
-                        ),
-                        ft.Text(
-                            self.message.parent_content,
-                            size=12,
-                            max_lines=1,
-                            overflow=ft.TextOverflow.ELLIPSIS,
-                            italic=True,
-                        ),
-                    ],
-                    spacing=1,
-                ),
-                padding=ft.padding.all(8),
-                # Marge en bas pour espacer du vrai message
-                margin=ft.margin.only(bottom=5),
-                bgcolor=ft.Colors.with_opacity(0.1, ft.Colors.ON_SURFACE_VARIANT),
-                border=ft.border.only(left=ft.BorderSide(4, ft.Colors.PRIMARY)),
-                border_radius=5,
-            )
+            @property
+            def parent_bubble(self):
+                if self.message.parent_id and self.message.parent_content:
+                    return ft.Container(
+                        content=ft.Column([
+                            ft.Text(
+                                f"@{self.message.parent_author}", 
+                                size=11, 
+                                weight="bold", 
+                                color=ft.Colors.BLUE_400
+                            ),
+                            ft.Text(
+                                self.message.parent_content, 
+                                size=12, 
+                                italic=True, 
+                                max_lines=1, 
+                                overflow="ellipsis"
+                            ),
+                        ], spacing=2),
+                        padding=ft.padding.all(8),
+                        bgcolor=ft.Colors.with_opacity(0.1, ft.Colors.BLACK),
+                        border_radius=5,
+                        border=ft.border.only(left=ft.BorderSide(3, ft.Colors.BLUE_400)),
+                        margin=ft.margin.only(bottom=5),
+                        on_click=lambda _: self.scroll_to_parent() # Optionnel : scroller vers l'ID
+                    )
+                return ft.Container()
+
 
     def update_ui(self):
         """Méthode pour rafraîchir uniquement les textes du message"""

@@ -464,7 +464,7 @@ async def ChatView(page: ft.Page):
                         for r in msg_data.get("reactions", []):
                             emj = r["emoji"]
                             reactions_counts[emj] = reactions_counts.get(emj, 0) + 1
-                            
+
                         # Mettre à jour la bulle ciblée
                         for m in chat_list.controls:
                             if hasattr(m, "message") and m.message.id == msg_data["id"]:
@@ -472,7 +472,7 @@ async def ChatView(page: ft.Page):
                                 # On appelle la nouvelle fonction créée à l'étape 2
                                 if hasattr(m, "update_reactions"):
                                     m.update_reactions()
-                                break                            
+                                break
                     else:
                         # Formatage des réactions
                         reactions_counts = {}
