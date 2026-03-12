@@ -2,6 +2,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+from websocket_manager import manager
 
 # Import des modules locaux
 from database.models import SessionLocal
@@ -11,9 +12,11 @@ from security import create_access_token, verify_password, SECRET_KEY, ALGORITHM
 
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
-
+from websocket_manager import router as ws_router, manager
 
 app = FastAPI(title="CIF Connect API", version="1.0.0")
+app.include_router(ws_router)  # On branche les websockets ici
+
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
@@ -187,14 +190,23 @@ def read_messages(room_id: int, current_user_id: int = Depends(get_current_user)
 	status_code=status.HTTP_201_CREATED,
 	tags=["Messages"],
 )
-def send_message(
+async def send_message(
 	room_id: int,
 	message_data: MessageCreate,
 	db: Session = Depends(get_db),
 	current_user_id: int = Depends(get_current_user),
 ):
 	"""Poster un message dans un salon"""
-	return db_inter.create_message(db, room_id, message_data, current_user_id)
+	# 1. Sauvegarde en base de données
+	new_msg = db_inter.create_message(db, room_id, message_data, current_user_id)
+
+	# 2. Conversion en dictionnaire pour le JSON
+	msg_dict = MessageSchema.model_validate(new_msg).model_dump(mode="json")
+
+	# 3. Diffusion immédiate aux autres élèves du salon
+	await manager.broadcast_to_room(room_id, msg_dict)
+
+	return new_msg
 
 
 @app.put("/message/{message_id}", tags=["Messages"])

@@ -65,7 +65,7 @@ class BaseChatMessage(ft.Row):
 		# On prépare le texte du timestamp
 		self.timestamp = self.message.message_time.strftime("%H:%M")
 		# Si le message n'est pas d'aujourd'hui, on ajoute la date
-		if self.message.message_date == datetime.now().date():
+		if self.message.message_date != datetime.now().date():
 			self.timestamp = f"{self.message.message_date.strftime('%d/%m')}  \t\t  {self.timestamp}"
 
 		# 1. Message Parent (Reply) - Full Width (Style WhatsApp)

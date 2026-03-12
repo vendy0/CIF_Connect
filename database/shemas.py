@@ -13,8 +13,10 @@ class UserMinimalSchema(BaseModel):
 	id: int
 	pseudo: Optional[str] = None
 
-	class ConfigDict:
-		from_attributes = True
+	# class ConfigDict:
+	# 	from_attributes = True
+
+	model_config = {"from_attributes": True}
 
 
 # ==============================================================================
@@ -38,8 +40,10 @@ class UserSchema(BaseModel):
 	created_at: datetime
 	last_pseudo_update: datetime
 
-	class ConfigDict:
-		from_attributes = True
+	model_config = {"from_attributes": True}
+
+	# class ConfigDict:
+	# 	from_attributes = True
 
 
 class LoginRequest(BaseModel):
@@ -78,8 +82,9 @@ class ReactionSchema(BaseModel):
 	# On inclut qui a réagi
 	user: UserMinimalSchema
 
-	class ConfigDict:
-		from_attributes = True
+	# class ConfigDict:
+	# 	from_attributes = True
+	model_config = {"from_attributes": True}
 
 
 class MessageCreate(BaseModel):
@@ -104,8 +109,10 @@ class MessageSchema(BaseModel):
 	author: UserMinimalSchema
 	reactions: List[ReactionSchema] = []
 
-	class ConfigDict:
-		from_attributes = True
+	model_config = {"from_attributes": True}
+
+	# class ConfigDict:
+	# 	from_attributes = True
 
 
 class EditMessageSchema(BaseModel):
@@ -143,8 +150,9 @@ class RoomSchema(BaseModel):
 	creator: Optional[UserMinimalSchema]  # Optional car le créateur peut avoir été supprimé
 	# On n'inclut pas toujours les messages par défaut pour ne pas alourdir
 
-	class ConfigDict:
-		from_attributes = True
+	# class ConfigDict:
+	# 	from_attributes = True
+	model_config = {"from_attributes": True}
 
 
 class CreateRoomSchema(BaseModel):
@@ -208,8 +216,8 @@ class ReportSchema(BaseModel):
 	reported_id: Optional[int]
 	message_id: Optional[int]
 
-	class ConfigDict:
-		from_attributes = True
+	# class ConfigDict:
+	# 	from_attributes = True
 
 
 # ... Garde ReportFullSchema tel quel ...
@@ -231,5 +239,5 @@ class ReportFullSchema(ReportSchema):
 	reported: Optional[UserMinimalSchema]
 	# On pourrait aussi inclure le contenu du message signalé si besoin
 
-	class ConfigDict:
-		from_attributes = True
+	# class ConfigDict:
+	# 	from_attributes = True

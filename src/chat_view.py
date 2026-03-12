@@ -8,6 +8,9 @@ from chat.models import Message
 from chat.api import fetch_room_messages, put_message, post_reaction, post_report, delete_message_bdd, post_message, post_quit_room
 from chat.dialogs import show_edit_dialog, show_delete_dialog, show_report_dialog, show_quit_dialog
 from utils import get_initials, get_avatar_color, get_colors, show_top_toast, format_date, copy_message
+import json
+import websockets
+import asyncio
 
 
 # =============================================================================
@@ -16,13 +19,6 @@ from utils import get_initials, get_avatar_color, get_colors, show_top_toast, fo
 
 
 async def ChatView(page: ft.Page):
-	# # On crée l'objet qui va gérer le tuyau
-	# ws = ft.WebSocketClient(url="ws://ton-serveur.com/ws", on_message=ma_fonction_qui_traite_le_message)
-	
-	# # On l'ajoute à la page pour qu'il commence à écouter
-	# page.overlay.append(ws)
-	# page.update()
-	# ws.connect()	# last_date Pour afficher une division si il y a changement de jour
 	storage = ft.SharedPreferences()
 	token = await storage.get("cif_token")
 
@@ -355,7 +351,7 @@ async def ChatView(page: ft.Page):
 			# Sinon, on va tout en bas
 			# await chat_list.scroll_to(offset=-1, duration=100)
 
-	page.pubsub.subscribe(on_message)
+	# page.pubsub.subscribe(on_message)
 
 	async def left_room(e):
 		await show_quit_dialog(page, current_room_id)
@@ -410,6 +406,46 @@ async def ChatView(page: ft.Page):
 		# --- MENU 3 POINTS ---
 		actions=[default_menu],
 	)
+
+	# Variable pour garder la main sur la connexion
+	ws_connection = None
+
+	async def listen_ws():
+		nonlocal ws_connection
+		ws_url = f"ws://127.0.0.1:8000/ws/{current_room_id}"
+
+		try:
+			async with websockets.connect(ws_url) as ws:
+				ws_connection = ws
+				async for data in ws:
+					msg_data = json.loads(data)
+
+					# Formatage des réactions
+					reactions_counts = {}
+					for r in msg_data.get("reactions", []):
+						emj = r["emoji"]
+						reactions_counts[emj] = reactions_counts.get(emj, 0) + 1
+
+					message_datetime = datetime.strptime(msg_data["created_at"], "%Y-%m-%dT%H:%M:%S")
+
+					new_msg = Message(id=msg_data["id"], pseudo=msg_data["author_display_name"], content=msg_data["content"], message_type=msg_data["message_type"], modified=msg_data["modified"], parent_id=msg_data["parent_id"], message_datetime=message_datetime, message_date=message_datetime.date(), message_time=message_datetime.time(), reactions=reactions_counts)
+
+					# Vérification doublon
+					existing_ids = [m.content[0].key for m in chat_list.controls if hasattr(m.content[0], "key")]
+					if str(new_msg.id) not in existing_ids:
+						is_me = new_msg.pseudo == current_pseudo
+						on_message(new_msg, is_me)
+
+						page.update()
+						chat_list.scroll_to(offset=-1, duration=300)
+						page.update()
+
+		except websockets.exceptions.ConnectionClosed:
+			# Comportement normal quand on force la fermeture
+			print(f"Déconnexion du salon {current_room_id}")
+
+	# Lancement en tâche de fond (ne bloque pas l'UI)
+	page.run_task(listen_ws)
 
 	return ft.View(
 		route="/chat",

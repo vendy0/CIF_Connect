@@ -434,38 +434,123 @@ async def websocket_endpoint(websocket: WebSocket, room_id: int):
 		# 2. Nettoyage automatique si l'élève ferme l'app ou perd le réseau
 		manager.disconnect(websocket, room_id)
 
+
 import json
 import flet as ft
 
+
 async def ChatView(page: ft.Page):
-    # ... tes récupérations de token et room_id ...
-    
-    # 1. La fonction qui traite les messages arrivant du serveur
-    async def on_ws_message(e):
-        msg_data = json.loads(e.data)
-        new_msg = Message(**msg_data)
-        
-        # Éviter le doublon si c'est notre propre message (déjà ajouté localement)
-        # ou l'ajouter ici si tu as choisi d'attendre le retour du serveur
-        if new_msg.id not in [m.id for m in chat_list.controls if hasattr(m, 'id')]:
-            if new_msg.pseudo == mon_pseudo:
-                chat_list.controls.append(MyChatMessage(new_msg, page))
-            else:
-                chat_list.controls.append(OtherChatMessage(new_msg, page))
-            
-            await chat_list.update_async()
-            # Scroll automatique vers le bas
-            chat_list.scroll_to(offset=-1, duration=300)
+	# ... tes récupérations de token et room_id ...
 
-    # 2. Création et configuration du client WebSocket
-    # Remplace par ton IP de serveur (ex: 10.0.2.2 pour l'émulateur Android)
-    ws_url = f"ws://127.0.0.1:8000/ws/{current_room_id}"
-    ws = ft.WebSocketClient(
-        url=ws_url,
-        on_message=on_ws_message
-    )
+	# 1. La fonction qui traite les messages arrivant du serveur
+	async def on_ws_message(e):
+		msg_data = json.loads(e.data)
+		new_msg = Message(**msg_data)
 
-    # 3. Ajout à la page et connexion
-    page.overlay.append(ws)
-    await page.update_async()
-    await ws.connect()
+		# Éviter le doublon si c'est notre propre message (déjà ajouté localement)
+		# ou l'ajouter ici si tu as choisi d'attendre le retour du serveur
+		if new_msg.id not in [m.id for m in chat_list.controls if hasattr(m, "id")]:
+			if new_msg.pseudo == mon_pseudo:
+				chat_list.controls.append(MyChatMessage(new_msg, page))
+			else:
+				chat_list.controls.append(OtherChatMessage(new_msg, page))
+
+			await chat_list.update_async()
+			# Scroll automatique vers le bas
+			chat_list.scroll_to(offset=-1, duration=300)
+
+	# 2. Création et configuration du client WebSocket
+	# Remplace par ton IP de serveur (ex: 10.0.2.2 pour l'émulateur Android)
+	ws_url = f"ws://127.0.0.1:8000/ws/{current_room_id}"
+	ws = ft.WebSocketClient(url=ws_url, on_message=on_ws_message)
+
+	# 3. Ajout à la page et connexion
+	page.overlay.append(ws)
+	await page.update_async()
+	await ws.connect()
+
+
+"""
+from fastapi import WebSocket, WebSocketDisconnect
+from typing import Dict, List
+
+# --- GESTIONNAIRE WEBSOCKET ---
+class ConnectionManager:
+	def __init__(self):
+		self.active_connections: Dict[int, List[WebSocket]] = {}
+
+	async def connect(self, websocket: WebSocket, room_id: int):
+		await websocket.accept()
+		if room_id not in self.active_connections:
+			self.active_connections[room_id] = []
+		self.active_connections[room_id].append(websocket)
+
+	def disconnect(self, websocket: WebSocket, room_id: int):
+		if room_id in self.active_connections:
+			self.active_connections[room_id].remove(websocket)
+			if not self.active_connections[room_id]:
+				del self.active_connections[room_id]
+
+	async def broadcast_to_room(self, room_id: int, message_data: dict):
+		if room_id in self.active_connections:
+			for connection in self.active_connections[room_id]:
+				await connection.send_json(message_data)
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/{room_id}")
+async def websocket_endpoint(websocket: WebSocket, room_id: int):
+	await manager.connect(websocket, room_id)
+	try:
+		while True:
+			# Garde la connexion ouverte pour recevoir si besoin
+			data = await websocket.receive_json()
+	except WebSocketDisconnect:
+		manager.disconnect(websocket, room_id)
+		
+		
+		
+		
+		
+	# --- ÉCOUTEUR WEBSOCKET ---
+	async def on_ws_message(e):
+		msg_data = json.loads(e.data)
+		
+		# On formatte les réactions comme attendu par ta fonction show_messages
+		reactions_counts = {}
+		for r in msg_data.get("reactions", []):
+			emj = r["emoji"]
+			reactions_counts[emj] = reactions_counts.get(emj, 0) + 1
+
+		# On crée l'objet Flet Message
+		message_datetime = datetime.strptime(msg_data["created_at"], "%Y-%m-%dT%H:%M:%S")
+		new_msg = Message(
+			id=msg_data["id"],
+			pseudo=msg_data["author"]["pseudo"] if "author" in msg_data else msg_data["author_display_name"],
+			content=msg_data["content"],
+			message_type=msg_data["message_type"],
+			modified=msg_data["modified"],
+			parent_id=msg_data["parent_id"],
+			message_datetime=message_datetime,
+			message_date=message_datetime.date(),
+			message_time=message_datetime.time(),
+			reactions=reactions_counts
+		)
+
+		# On vérifie si l'ID est déjà affiché pour éviter le doublon
+		existing_ids = [m.controls[0].key for m in chat_list.controls if hasattr(m.controls[0], 'key')]
+		if str(new_msg.id) not in existing_ids:
+			is_me = new_msg.pseudo == current_pseudo
+			on_message(new_msg, is_me)
+			
+			await chat_list.update_async()
+			chat_list.scroll_to(offset=-1, duration=300)
+
+	ws_url = f"ws://127.0.0.1:8000/ws/{current_room_id}"
+	ws = ft.WebSocketClient(url=ws_url, on_message=on_ws_message)
+	page.overlay.append(ws)
+	page.update()
+	page.run_task(ws.connect)
+		
+
+"""
