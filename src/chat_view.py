@@ -16,7 +16,13 @@ from utils import get_initials, get_avatar_color, get_colors, show_top_toast, fo
 
 
 async def ChatView(page: ft.Page):
-	# last_date Pour afficher une division si il y a changement de jour
+	# # On crée l'objet qui va gérer le tuyau
+	# ws = ft.WebSocketClient(url="ws://ton-serveur.com/ws", on_message=ma_fonction_qui_traite_le_message)
+	
+	# # On l'ajoute à la page pour qu'il commence à écouter
+	# page.overlay.append(ws)
+	# page.update()
+	# ws.connect()	# last_date Pour afficher une division si il y a changement de jour
 	storage = ft.SharedPreferences()
 	token = await storage.get("cif_token")
 

@@ -18,6 +18,7 @@
 # - Mettre à jour la page room_info pour changer le nombre de membres en ligne
 # - Désactiver l'auto scroll quand on remonte
 # - Ajouter la colonne last read dans la bdd
+# - Mettre les messages en fil d'attente
 
 
 
@@ -38,6 +39,63 @@
 
 
 # =========== LES WEBSOCKETS ========== #
+
+
+
+
+
+
+Pour les messages non lus :
+La meilleure approche (hybride) :
+ * Ajoute une colonne last_read_at dans models.py sur ta table de liaison user_room (c'est la BDD qui fait foi).
+ * Quand l'élève quitte ChatView, tu envoies une requête PUT /user/rooms/{id}/read avec l'heure actuelle.
+ * Le badge dans utils.py sera conditionné par le calcul fait par le backend (total_messages - messages_before_last_read), renvoyé lors du /user/rooms. Ne te casse pas la tête à le calculer en front-end, le back-end est fait pour ça !
+3. Logique de ChatView (Scroll, Recherche et Menu)
+Désactiver l'auto-scroll si on remonte :
+La détection de scroll dans Flet est capricieuse si on ne laisse pas une marge (tolérance).
+# Dans chat_view.py, avant de définir chat_list :
+    def on_chat_scroll(e: ft.OnScrollEvent):
+        # Si on est à moins de 30 pixels du bas, on réactive l'autoscroll
+        is_at_bottom = e.pixels >= (e.max_scroll_extent - 30)
+        chat_list.auto_scroll = is_at_bottom
+        page.update()
+
+    chat_list = ft.ListView(expand=True, spacing=15, auto_scroll=True, padding=10, on_scroll=on_chat_scroll)
+
+Recherche de message par Scroll :
+Au lieu de cacher les messages, on défile jusqu'à eux grâce à la propriété key.
+# Remplacer ta fonction filter_messages dans chat_view.py par :
+    async def filter_messages(query: str):
+        if not query:
+            return
+        query = query.lower()
+
+        # On cherche d'abord dans les messages déjà chargés localement
+        for ctrl in chat_list.controls:
+            if hasattr(ctrl, "message") and query in ctrl.message.content.lower():
+                await chat_list.scroll_to(key=str(ctrl.message.id), duration=300)
+                await show_top_toast(page, "Message trouvé ! (En local)")
+                return
+
+        # TODO plus tard : Si on n'a pas trouvé, faire une requête API pour récupérer l'historique plus ancien.
+        await show_top_toast(page, "Message non trouvé dans l'historique récent.", True)
+
+Unifier le rendu des messages :
+Créer deux classes distinctes (MyChatMessage, OtherChatMessage) te fait dupliquer du code. Crée une fonction générique pour centraliser :
+# Dans chat_view.py, remplace les appels if message.pseudo != current_pseudo par :
+    def render_single_message(message: Message, is_me: bool):
+        # Assigne l'id comme clé pour le scroll_to()
+        key_str = str(message.id)
+
+        if is_me:
+            return MyChatMessage(key=key_str, message=message, page=page, ...) # Passe les callbacks
+        else:
+            return OtherChatMessage(key=key_str, message=message, page=page, ...)
+
+# Et dans def on_message(message: Message):
+    if message.message_type == "chat":
+        is_me = (message.pseudo == current_pseudo)
+        chat_list.controls.append(render_single_message(message, is_me))
 
 """
 # // "ON_PRIMARY",
@@ -176,3 +234,238 @@ class ConnectionManager:
 			except:
 				# Si ça échoue, c'est que l'élève est parti
 				self.disconnect(connection)
+
+
+# On crée l'objet qui va gérer le tuyau
+ws = ft.WebSocketClient(url="ws://ton-serveur.com/ws", on_message=ma_fonction_qui_traite_le_message)
+
+# On l'ajoute à la page pour qu'il commence à écouter
+page.overlay.append(ws)
+page.update()
+ws.connect()
+
+
+class ConnectionManager:
+	def __init__(self):
+		# Un dictionnaire pour lier un room_id à une liste de connexions
+		self.active_connections: dict[int, list[WebSocket]] = {}
+
+	async def connect(self, websocket: WebSocket, room_id: int):
+		# Logique pour accepter et stocker la connexion
+		pass
+
+	async def broadcast(self, message: dict, room_id: int):
+		# Logique pour envoyer le message à tous ceux qui sont dans ce salon
+		pass
+
+
+class ConnectionManager:
+	def __init__(self):
+		# Dictionnaire : { room_id: [liste_des_websockets_connectés] }
+		self.active_connections: dict[int, list[WebSocket]] = {}
+
+	async def connect(self, websocket: WebSocket, room_id: int):
+		await websocket.accept()
+		# Si le salon n'existe pas encore dans notre dictionnaire, on le crée
+		if room_id not in self.active_connections:
+			self.active_connections[room_id] = []
+		self.active_connections[room_id].append(websocket)
+
+	def disconnect(self, websocket: WebSocket, room_id: int):
+		# On retire le tuyau du salon spécifique
+		if room_id in self.active_connections:
+			self.active_connections[room_id].remove(websocket)
+
+
+from fastapi import WebSocket
+from typing import Dict, List
+
+
+class ConnectionManager:
+	def __init__(self):
+		# Structure : { room_id: [websocket1, websocket2, ...] }
+		self.active_connections: Dict[int, List[WebSocket]] = {}
+
+	async def connect(self, websocket: WebSocket, room_id: int):
+		await websocket.accept()
+		if room_id not in self.active_connections:
+			self.active_connections[room_id] = []
+		self.active_connections[room_id].append(websocket)
+
+	def disconnect(self, websocket: WebSocket, room_id: int):
+		if room_id in self.active_connections:
+			self.active_connections[room_id].remove(websocket)
+			# Nettoyage si le salon est vide
+			if not self.active_connections[room_id]:
+				del self.active_connections[room_id]
+
+	async def broadcast_to_room(self, room_id: int, message_data: dict):
+		"""Envoie le message uniquement aux membres du salon spécifié."""
+		if room_id in self.active_connections:
+			for connection in self.active_connections[room_id]:
+				await connection.send_json(message_data)
+
+
+manager = ConnectionManager()
+
+
+@app.websocket("/ws/{room_id}")
+async def websocket_endpoint(websocket: WebSocket, room_id: int):
+	# 1. Connexion et stockage
+	await manager.connect(websocket, room_id)
+	try:
+		while True:
+			# 2. Attente de réception (si l'élève envoie via WS)
+			data = await websocket.receive_json()
+
+			# 3. Diffusion à tout le salon
+			# Note : On peut ajouter ici la sauvegarde en BDD via tes fonctions CRUD
+			await manager.broadcast_to_room(room_id, data)
+	except Exception:
+		# 4. Déconnexion automatique en cas de fermeture d'app ou erreur
+		manager.disconnect(websocket, room_id)
+
+
+# Exemple dans ta route POST message
+@app.post("/room/{room_id}/messages")
+async def create_message(room_id: int, payload: dict):
+	# ... ta logique CRUD actuelle pour sauver le message ...
+	new_msg = await crud.save_message(payload)
+
+	# On prévient tout le monde dans le salon via le tuyau
+	await manager.broadcast_to_room(room_id, new_msg)
+
+	return new_msg
+
+
+async def ChatView(page: ft.Page):
+	# ... ton code actuel (récupération du token, room_id, etc.) ...
+
+	async def on_ws_message(e):
+		# 1. On reçoit les données (souvent en JSON)
+		# 2. On les transforme en objet Message (ton modèle)
+		# 3. On ajoute le message à la liste visuelle (chat_list)
+		# 4. On fait page.update()
+		pass
+
+	# Création du client WebSocket
+	ws = ft.WebSocketClient(url=f"ws://localhost:8000/ws/{current_room_id}", on_message=on_ws_message)
+
+	# On l'ajoute à la page pour qu'il s'active
+	page.overlay.append(ws)
+	page.update()
+
+	# On lance la connexion
+	await ws.connect()
+
+
+# Dans ton ChatView
+async def on_ws_message(data_brute):
+	# Le serveur nous envoie du JSON
+	import json
+
+	data = json.loads(data_brute)
+
+	# On crée l'objet Message à partir du JSON
+	new_msg = Message(**data)
+
+	# On choisit le bon composant (Moi ou un Autre)
+	# user_id est celui stocké dans tes SharedPreferences
+	if new_msg.user_id == current_user_id:
+		chat_list.controls.append(MyChatMessage(new_msg, ...))
+	else:
+		chat_list.controls.append(OtherChatMessage(new_msg, ...))
+
+	# LA commande magique !
+	await page.update_async()
+
+
+from fastapi import WebSocket
+from typing import Dict, List
+
+
+class ConnectionManager:
+	def __init__(self):
+		# On stocke les connexions par salon : { room_id: [liste_des_websockets] }
+		self.active_connections: Dict[int, List[WebSocket]] = {}
+
+	async def connect(self, websocket: WebSocket, room_id: int):
+		"""Branche un élève dans un salon spécifique."""
+		await websocket.accept()
+		if room_id not in self.active_connections:
+			self.active_connections[room_id] = []
+		self.active_connections[room_id].append(websocket)
+
+	def disconnect(self, websocket: WebSocket, room_id: int):
+		"""Débranche l'élève et nettoie le salon si vide."""
+		if room_id in self.active_connections:
+			self.active_connections[room_id].remove(websocket)
+			if not self.active_connections[room_id]:
+				del self.active_connections[room_id]
+
+	async def broadcast_to_room(self, room_id: int, message_data: dict):
+		"""Envoie l'info à tout le monde dans le salon visé."""
+		if room_id in self.active_connections:
+			for connection in self.active_connections[room_id]:
+				# On utilise send_json pour envoyer le dictionnaire directement
+				await connection.send_json(message_data)
+
+
+manager = ConnectionManager()
+
+from fastapi import WebSocket, WebSocketDisconnect
+
+
+@app.websocket("/ws/{room_id}")
+async def websocket_endpoint(websocket: WebSocket, room_id: int):
+	# 1. On accepte la connexion et on enregistre le "tuyau" dans le manager
+	await manager.connect(websocket, room_id)
+
+	try:
+		while True:
+			# On reste en attente de messages envoyés par le client via WS
+			# (Même si on utilise le mode mixte, il faut garder la boucle ouverte)
+			data = await websocket.receive_json()
+
+			# Si tu veux que le WS serve aussi à envoyer, on diffuse ici :
+			# await manager.broadcast_to_room(room_id, data)
+
+	except WebSocketDisconnect:
+		# 2. Nettoyage automatique si l'élève ferme l'app ou perd le réseau
+		manager.disconnect(websocket, room_id)
+
+import json
+import flet as ft
+
+async def ChatView(page: ft.Page):
+    # ... tes récupérations de token et room_id ...
+    
+    # 1. La fonction qui traite les messages arrivant du serveur
+    async def on_ws_message(e):
+        msg_data = json.loads(e.data)
+        new_msg = Message(**msg_data)
+        
+        # Éviter le doublon si c'est notre propre message (déjà ajouté localement)
+        # ou l'ajouter ici si tu as choisi d'attendre le retour du serveur
+        if new_msg.id not in [m.id for m in chat_list.controls if hasattr(m, 'id')]:
+            if new_msg.pseudo == mon_pseudo:
+                chat_list.controls.append(MyChatMessage(new_msg, page))
+            else:
+                chat_list.controls.append(OtherChatMessage(new_msg, page))
+            
+            await chat_list.update_async()
+            # Scroll automatique vers le bas
+            chat_list.scroll_to(offset=-1, duration=300)
+
+    # 2. Création et configuration du client WebSocket
+    # Remplace par ton IP de serveur (ex: 10.0.2.2 pour l'émulateur Android)
+    ws_url = f"ws://127.0.0.1:8000/ws/{current_room_id}"
+    ws = ft.WebSocketClient(
+        url=ws_url,
+        on_message=on_ws_message
+    )
+
+    # 3. Ajout à la page et connexion
+    page.overlay.append(ws)
+    await page.update_async()
+    await ws.connect()
