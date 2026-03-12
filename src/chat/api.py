@@ -29,13 +29,12 @@ async def fetch_room_messages(page, room_id):
 async def put_message(page, edit_message_input, msg):
 	try:
 		response = await api.put(f"/message/{msg.id}", data={"content": msg.content})
-		# Si le jeton est expiré ou invalide (401)
 		if response.status_code not in [200, 201]:
 			edit_message_input.error = response.json().get("detail", "Erreur inconnue")
 			await show_top_toast(page, "La session a expiré !", True)
 			page.update()
-			return response.json()
-		return
+			return
+		return response.json()
 
 	except httpx.RequestError as ex:
 		await show_top_toast(page, "Erreur réseau !", True)
@@ -69,15 +68,16 @@ async def post_report(page, msg_id, report_reason_input):
 			await show_top_toast(page, "Erreur lors du signalement !", True)
 			report_reason_input.error = "Il y a eu urreur lors du signalement !"
 			page.update()
-			return
+			return False
 
 		await show_top_toast(page, "Signalement envoyé à la modération.")
+		return True
 
 	except httpx.RequestError as ex:
 		await show_top_toast(page, "Erreur réseau !", True)
 		report_reason_input.error = "Serveur injoignable"
 		page.update()
-		return
+		return False
 
 
 async def delete_message_bdd(page, msg_id):
@@ -86,16 +86,17 @@ async def delete_message_bdd(page, msg_id):
 
 		if response.status_code != 204:
 			await show_top_toast(page, response.json().get("detail", "Erreur lors de la suppression !"), True)
-			return
+			return False
 
 		page.pop_dialog()
 		await show_top_toast(page, "Message supprimé !")
 		page.update()
+		return True
 
 	except httpx.RequestError as ex:
 		await show_top_toast(page, "Erreur lors de la suppression !", True)
 		page.update()
-		return
+		return False
 
 
 async def post_message(page, room_id, parent_id, new_message_input):

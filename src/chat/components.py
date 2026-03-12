@@ -62,7 +62,7 @@ class BaseChatMessage(ft.Row):
 		self.vertical_alignment = ft.CrossAxisAlignment.START
 		self.parent_bubble = ft.Container()
 		self.content_text = ft.Text(self.message.content, size=15)
-		self.modified_text = ft.Text("Modifié •", size=9, italic=True, visible=False)
+		self.modified_text = ft.Text("Modifié •", size=9, italic=True, visible=self.message.modified)
 		self.reactions_container = ft.Container(content=self.get_reactions_row(), bottom=0)
 
 		# Dans components.py, à l'intérieur de MyChatMessage et OtherChatMessage
