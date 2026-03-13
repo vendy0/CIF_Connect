@@ -115,7 +115,7 @@ async def delete_message_bdd(page, msg_id):
 		return False
 
 
-async def post_message(page, room_id, parent_id, new_message_input):
+async def post_message(page, room_id, parent_id, new_message_input, on_success=None):
 	msg = new_message_input.value.strip()
 	new_message_input.value = ""
 	try:
@@ -131,6 +131,7 @@ async def post_message(page, room_id, parent_id, new_message_input):
 			return
 
 		new_message_input.error = None
+
 		await new_message_input.focus()
 		return response.json()
 
@@ -140,6 +141,9 @@ async def post_message(page, room_id, parent_id, new_message_input):
 		new_message_input.error = "Erreur, Message non envoyé !"
 		page.update()
 		return
+	finally:
+		if on_success:
+			on_success()
 
 
 async def post_quit_room(page, room_id):

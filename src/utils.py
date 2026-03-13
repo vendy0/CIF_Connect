@@ -253,18 +253,18 @@ unread_badge = ft.Container(
 
 
 class Room:
-	def __init__(self, page, room_id, name, last_msg_content, last_msg_author, last_msg_time, unread_count, icon=ft.Icons.CHAT_BUBBLE_ROUNDED):
+	def __init__(self, page, room_id, name, last_msg_content, last_msg_author, last_msg_time, unread_count,last_read_id, icon=ft.Icons.CHAT_BUBBLE_ROUNDED):
 		self.page = page
 		self.id = room_id
 		self.name = name
 		self.icon = icon
+		self.last_read_id = last_read_id
 
 		# Formater le sous-titre (Style WhatsApp)
 		if last_msg_author:
 			subtitle_text = f"~{last_msg_author}: {last_msg_content}"
 		else:
 			subtitle_text = last_msg_content
-			
 
 		# Rendre le badge dynamique
 		unread_badge = ft.Container(
@@ -279,7 +279,7 @@ class Room:
 			key=str(self.id),
 			leading=ft.Icon(icon=self.icon, color=ft.Colors.BLUE_600),
 			title=ft.Text(self.name, weight="bold"),
-			subtitle=ft.Text(subtitle_text, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, color =ft.Colors.GREEN_500 if unread_count > 0 else None),  # Tronquer si trop long
+			subtitle=ft.Text(subtitle_text, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, color=ft.Colors.GREEN_500 if unread_count > 0 else None),  # Tronquer si trop long
 			data=self.id,
 			on_click=self.join_room,
 			trailing=ft.Column(
@@ -295,6 +295,7 @@ class Room:
 	async def join_room(self, e):
 		self.page.session.store.set("current_room_id", self.id)
 		self.page.session.store.set("current_room_name", self.name)
+		self.page.session.store.set("last_read_id", self.last_read_id) # <-- AJOUT
 		await self.page.push_route(route="/chat")
 
 

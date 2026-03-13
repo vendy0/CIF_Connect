@@ -88,17 +88,6 @@ async def RoomsView(page: ft.Page):
 			room_list.controls.clear()
 			room_list.controls.append(info_text)
 
-			# for r in data:
-			# 	new_room_obj = Room(
-			# 		page=page,
-			# 		room_id=r["id"],
-			# 		name=r["name"],
-			# 		description=r["description"],
-			# 		icon=r["icon"],
-			# 	)
-			# 	room_list.controls.append(new_room_obj.controls)
-			# 	room_list.controls.append(ft.Divider(height=2))
-
 			for r in data:
 				new_room_obj = Room(
 					page=page,
@@ -107,6 +96,7 @@ async def RoomsView(page: ft.Page):
 					last_msg_content=r.get("last_message_content", ""),
 					last_msg_author=r.get("last_message_author", ""),
 					last_msg_time=r.get("last_message_time", ""),
+					last_read_id=r.get("last_read_id", ""),
 					unread_count=r.get("unread_count", 0),
 					icon=r["icon"],
 				)

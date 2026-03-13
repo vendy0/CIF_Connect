@@ -55,6 +55,7 @@ async def ChatView(page: ft.Page):
 
 	current_room_id = page.session.store.get("current_room_id") or 1
 	current_room_name = page.session.store.get("current_room_name") or "Salon Inconnue..."
+	last_read_id = page.session.store.get("last_read_id") or 0
 	current_pseudo = await storage.get("user_pseudo") or "Anonyme"
 
 	replying_to_message: Optional[Message] = None
@@ -164,6 +165,17 @@ async def ChatView(page: ft.Page):
 			],
 		),
 	)
+
+	def start_loading():
+		icon_send.content = ft.ProgressRing(width=20, height=20, stroke_width=2)
+		icon_send.disabled = True  # Évite les clics multiples
+		page.update()
+
+	def end_loading():
+		icon_send.content = ft.Container(content=ft.IconButton(icon=ft.Icons.SEND_ROUNDED, icon_color="blue", on_click=send_click))
+		icon_send.disabled = False
+		page.update()
+
 	new_message = ft.TextField(hint_text="Écrivez un message...", capitalization=ft.TextCapitalization.SENTENCES, autofocus=False, expand=True, multiline=True, min_lines=1, max_lines=5, border_radius=20)
 
 	async def go_to_rooms(e):
@@ -184,7 +196,6 @@ async def ChatView(page: ft.Page):
 		replying_to_message = msg
 		reply_banner.visible = True
 		reply_banner.content.controls[0].controls[1].value = f"{msg.pseudo}: {msg.content[:30]}..."
-		await new_message.focus()
 		page.update()
 
 	async def edit_message(e, msg: Message):
@@ -244,25 +255,18 @@ async def ChatView(page: ft.Page):
 		if not new_message.value.strip():
 			return
 
-		new_message.on_click = None
-
-		# await ft.Clipboard().set(value=new_message.value.strip())
+		start_loading()
 
 		parent_id = replying_to_message.id if replying_to_message else None
 		await cancel_reply(None)
 
-		message = await post_message(page, current_room_id, parent_id, new_message)
-		new_message.on_click = send_click
+		message = await post_message(page, current_room_id, parent_id, new_message, on_success=end_loading)
 		if not message:
 			return
 
-		# Dans send_click, juste après avoir reçu la réponse de post_message :
 		if chat_container.content != chat_list:
 			chat_container.content = chat_list
 			chat_container.alignment = None
-			page.update()
-
-		# await storage.set(f"last_read_{current_room_id}", message["id"])
 
 		page.update()
 
@@ -283,10 +287,12 @@ async def ChatView(page: ft.Page):
 		page.update()
 
 	async def show_messages(messages_received, first_load=False):
-		nonlocal chat_list, last_date, current_room_id
+		nonlocal chat_list, last_date, current_room_id, last_read_id
 		last_message_id = None
+
 		# On affiche les messages
 		if messages_received:
+			unread_divider_inserted = False
 			if isinstance(messages_received, dict):
 				messages_received = [messages_received]
 
@@ -332,6 +338,21 @@ async def ChatView(page: ft.Page):
 					parent_author=parent_author,
 					reactions=reactions_counts,  # <--- On passe notre dictionnaire ici
 				)
+				if first_load and me.id > last_read_id and not unread_divider_inserted and last_read_id != 0:
+					unread_divider = ft.Container(
+						content=ft.Row(
+							[
+								ft.Divider(expand=True, color=ft.Colors.RED_400),
+								ft.Text("Nouveaux messages", size=12, color=ft.Colors.RED_400, weight="bold"),
+								ft.Divider(expand=True, color=ft.Colors.RED_400),
+							]
+						),
+						margin=ft.margin.symmetric(vertical=10),
+						key=f"unread_{last_read_id}",  # Une clé unique pour le saut
+					)
+					chat_list.controls.append(unread_divider)
+					# chat_list.auto_scroll = False
+					unread_divider_inserted = True
 
 				# Si le jour est différent du message précédent, on insère un badge de date
 				if message_date != last_date:
@@ -356,7 +377,7 @@ async def ChatView(page: ft.Page):
 				is_me = me.pseudo == current_pseudo
 				on_message(me, is_me)
 				last_message_id = me.id
-			await mark_room_messages_as_read(page, current_room_id, last_message_id)
+			page.run_task(mark_room_messages_as_read, page, current_room_id, last_message_id)
 			page.update()
 			# await chat_list.scroll_to(offset=-1, duration=100)
 			# On affiche le message
@@ -427,12 +448,13 @@ async def ChatView(page: ft.Page):
 		actions=[default_menu],
 	)
 
+	icon_send = ft.Container(content=ft.IconButton(icon=ft.Icons.SEND_ROUNDED, icon_color="blue", on_click=send_click))
+
 	# Variable pour garder la main sur la connexion
 	ws_connection = None
 
 	async def listen_ws():
-		nonlocal current_room_id
-		nonlocal ws_connection
+		nonlocal current_room_id, ws_connection
 		ws_url = f"ws://127.0.0.1:8000/ws/{current_room_id}"
 
 		try:
@@ -501,7 +523,7 @@ async def ChatView(page: ft.Page):
 						if str(new_msg.id) not in existing_ids:
 							is_me = new_msg.pseudo == current_pseudo
 							on_message(new_msg, is_me)
-							await mark_room_messages_as_read(page, current_room_id, new_msg.id)
+							page.run_task(mark_room_messages_as_read, page, current_room_id, new_msg.id)
 					page.update()
 
 		except websockets.exceptions.ConnectionClosed:
@@ -527,7 +549,7 @@ async def ChatView(page: ft.Page):
 					spacing=0,
 					controls=[
 						reply_banner,
-						ft.Row([new_message, ft.IconButton(icon=ft.Icons.SEND_ROUNDED, icon_color="blue", on_click=send_click)]),
+						ft.Row([new_message, icon_send]),
 					],
 				),
 				padding=ft.padding.Padding(left=10, top=5, right=10, bottom=15),

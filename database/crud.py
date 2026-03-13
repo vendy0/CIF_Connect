@@ -134,75 +134,6 @@ def get_all_rooms(db: Session):
 	return db.execute(stmt).scalars().all()
 
 
-# def get_user_rooms(db: Session, user_id: int):
-#     last_msg_sub = select(Message.room_id, func.max(Message.created_at).label("last_message_date")).group_by(Message.room_id).subquery()
-#
-#     stmt = (
-#         select(Room)
-#         .options(joinedload(Room.creator))
-#         .join(user_room, Room.id == user_room.c.room_id)
-#         .outerjoin(last_msg_sub, Room.id == last_msg_sub.c.room_id)
-#         .where(user_room.c.user_id == user_id, Room.active == True)
-#         .order_by(
-#             desc(Room.id == 1),  # Toujours le salon 1 en premier
-#             desc(last_msg_sub.c.last_message_date),
-#             desc(Room.created_at),
-#         )
-#     )
-#
-#     return db.execute(stmt).scalars().all()
-
-
-# # def get_user_rooms(db: Session, user_id: int):
-# 	La sous-requête existante
-# # 	last_msg_sub = select(Message.room_id, func.max(Message.created_at).label("last_message_date")).group_by(Message.room_id).subquery()
-# #
-# # 	stmt = (
-# # 		select(Room)
-# # 		.options(joinedload(Room.creator))
-# # 		.join(user_room, Room.id == user_room.c.room_id)
-# # 		.outerjoin(last_msg_sub, Room.id == last_msg_sub.c.room_id)
-# # 		.where(user_room.c.user_id == user_id, Room.active == True)
-# # 		.order_by(
-# # 			desc(Room.id == 1),
-# # 			desc(last_msg_sub.c.last_message_date),
-# # 			desc(Room.created_at),
-# # 		)
-# # 	)
-# #
-# # 	rooms = db.execute(stmt).scalars().all()
-# # 	result = []
-# #
-# # 	for r in rooms:
-# 		Récupérer l'ID du dernier message lu depuis la table d'association
-# # 		ur = db.execute(select(user_room).where(user_room.c.user_id == user_id, user_room.c.room_id == r.id)).first()
-# # 		last_read_id = getattr(ur, "last_read_message_id", 0) if ur else 0
-# #
-# 		Récupérer le vrai dernier message
-# # 		last_msg = db.execute(select(Message).where(Message.room_id == r.id).order_by(Message.created_at.desc())).scalars().first()
-# #
-# 		Compter les messages non lus (dont l'ID est supérieur au dernier lu)
-# # 		unread = db.execute(select(func.count(Message.id)).where(Message.room_id == r.id, Message.id > (last_read_id or 0))).scalar()
-# #
-# 		Construction du dictionnaire
-# # 		r_dict = {c.name: getattr(r, c.name) for c in r.__table__.columns}
-# 		r_dict["creator"] = r.creator
-#
-# 		if last_msg:
-# 			r_dict["last_message_content"] = last_msg.content
-# 			r_dict["last_message_author"] = last_msg.author_display_name
-# 			r_dict["last_message_time"] = last_msg.created_at.strftime("%H:%M")
-# 		else:
-# 			r_dict["last_message_content"] = r.description  # Fallback sur la description si vide
-# 			r_dict["last_message_author"] = ""
-# 			r_dict["last_message_time"] = ""
-#
-# 		r_dict["unread_count"] = unread or 0
-# 		result.append(r_dict)
-#
-# 	return result
-
-
 def get_user_rooms(db: Session, user_id: int):
 	# 1. Sous-requête : On filtre avec .where(Message.message_type == "chat")
 	last_msg_sub = (
@@ -265,6 +196,7 @@ def get_user_rooms(db: Session, user_id: int):
 			r_dict["last_message_time"] = ""
 
 		r_dict["unread_count"] = unread or 0
+		r_dict["last_read_id"] = last_read_id
 		result.append(r_dict)
 
 	return result

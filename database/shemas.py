@@ -152,10 +152,11 @@ class RoomSchema(BaseModel):
 	created_at: datetime
 	creator: Optional[UserMinimalSchema]
 
-	# --- Nouveaux champs pour la liste ---
 	last_message_content: Optional[str] = None
 	last_message_author: Optional[str] = None
 	last_message_time: Optional[str] = None
+	
+	last_read_id: int = 0
 	unread_count: int = 0
 
 	model_config = {"from_attributes": True}

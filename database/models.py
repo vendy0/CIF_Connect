@@ -25,14 +25,17 @@ DB_FILENAME = "cif_connect_demo.db"
 # ==============================================================================
 
 # echo=True utile pour voir les requêtes SQL dans la console en dev
-engine = create_engine(f"sqlite:///{DB_FILENAME}", echo=False, future=True)
+engine = create_engine(f"sqlite:///{DB_FILENAME}", echo=False, future=True, connect_args={"timeout": 15})
 
 
 # Active les Foreign Keys pour SQLite (désactivé par défaut)
+# 2. Active le mode WAL et le mode NORMAL pour les performances
 @event.listens_for(engine, "connect")
-def enable_foreign_keys(dbapi_connection, connection_record):
+def enable_foreign_keys_configure_sqlite(dbapi_connection, connection_record):
 	cursor = dbapi_connection.cursor()
 	cursor.execute("PRAGMA foreign_keys=ON")
+	cursor.execute("PRAGMA journal_mode=WAL")  # <-- LA MAGIE EST ICI
+	cursor.execute("PRAGMA synchronous=NORMAL")  # <-- BOOSTE LA VITESSE
 	cursor.close()
 
 
