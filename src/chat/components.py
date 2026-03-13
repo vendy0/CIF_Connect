@@ -39,19 +39,10 @@ class SystemMessage(ft.Row):
 
 
 class BaseChatMessage(ft.Row):
-	def __init__(
-		self,
-		message: Message,
-		page: ft.Page,
-		on_copy,
-		on_reply,
-		on_edit,
-		on_report,
-		on_react,
-		on_delete,
-	):
+	def __init__(self, message: Message, page: ft.Page, on_copy, on_reply, on_edit, on_report, on_react, on_delete):
 		super().__init__()
 		self.message = message
+		key = str(self.message.id)
 		self._page_ref = page
 		self.on_copy = on_copy
 		self.on_reply = on_reply
@@ -59,6 +50,7 @@ class BaseChatMessage(ft.Row):
 		self.on_react = on_react
 		self.on_report = on_report
 		self.on_delete = on_delete
+		# self.scroll_to_parent = scroll_to_parent
 		self.vertical_alignment = ft.CrossAxisAlignment.START
 		self.parent_bubble = ft.Container()
 		self.content_text = ft.Text(self.message.content, size=15)
@@ -87,7 +79,7 @@ class BaseChatMessage(ft.Row):
 				border_radius=5,
 				border=ft.border.only(left=ft.BorderSide(3, ft.Colors.BLUE_400)),
 				margin=ft.margin.only(bottom=5),
-				# on_click=lambda _: self.scroll_to_parent() # <-- On commente ça pour l'instant pour éviter un crash !
+				# on_click=lambda _: self._page_ref.run_task(self.scroll_to_parent, self.message.parent_id),  # <-- On commente ça pour l'instant pour éviter un crash !
 			)
 
 	def update_ui(self):
@@ -227,7 +219,6 @@ class MyChatMessage(BaseChatMessage):
 		)
 
 		message_avec_swipe = ft.Dismissible(
-			key=str(self.message.id),  # Obligatoire pour un Dismissible
 			content=bulle_complet,
 			dismiss_thresholds={ft.DismissDirection.START_TO_END: 0.1},
 			dismiss_direction=ft.DismissDirection.START_TO_END,  # Glisser vers la droite
@@ -304,7 +295,6 @@ class OtherChatMessage(BaseChatMessage):
 		)
 
 		message_avec_swipe = ft.Dismissible(
-			key=str(self.message.id),  # Obligatoire pour un Dismissible
 			content=bulle_complet,
 			dismiss_thresholds={ft.DismissDirection.START_TO_END: 0.1},
 			dismiss_direction=ft.DismissDirection.START_TO_END,  # Glisser vers la droite

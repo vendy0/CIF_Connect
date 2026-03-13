@@ -118,6 +118,7 @@ async def delete_message_bdd(page, msg_id):
 async def post_message(page, room_id, parent_id, new_message_input, on_success=None):
 	msg = new_message_input.value.strip()
 	new_message_input.value = ""
+	page.update()
 	try:
 		payload = {"content": msg, "parent_id": parent_id}
 		response = await api.post(f"/room/{room_id}/messages", data=payload)
@@ -133,17 +134,17 @@ async def post_message(page, room_id, parent_id, new_message_input, on_success=N
 		new_message_input.error = None
 
 		await new_message_input.focus()
+		page.update()
 		return response.json()
 
 	except httpx.RequestError as ex:
 		new_message_input.value = msg
 		await show_top_toast(page, "Erreur lors de l'envoi du message !", True)
 		new_message_input.error = "Erreur, Message non envoyé !"
-		page.update()
-		return
 	finally:
 		if on_success:
 			on_success()
+			page.update
 
 
 async def post_quit_room(page, room_id):

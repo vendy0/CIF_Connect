@@ -259,6 +259,7 @@ async def ChatView(page: ft.Page):
 
 		parent_id = replying_to_message.id if replying_to_message else None
 		await cancel_reply(None)
+		page.update()
 
 		message = await post_message(page, current_room_id, parent_id, new_message, on_success=end_loading)
 		if not message:
@@ -268,15 +269,19 @@ async def ChatView(page: ft.Page):
 			chat_container.content = chat_list
 			chat_container.alignment = None
 
-		page.update()
 
 		message_datetime = datetime.strptime(message["created_at"], "%Y-%m-%dT%H:%M:%S")
 		message_date = message_datetime.date()
 		message_time = message_datetime.time()
 
 	def on_message(message: Message, is_me):
-		# if message.parent_author == current_pseudo:
-		# 	print("VIBRATION")
+		async def scroll_to_parent(parent_key):
+			return
+			await chat_list.scroll_to(scroll_key=str(parent_key))
+			chat_list.update()
+			print("Est en train de scroll")
+			page.update()
+
 		if message.message_type in ["join", "quit"]:
 			chat_list.controls.append(SystemMessage(message))
 		elif message.message_type == "chat":
@@ -356,13 +361,6 @@ async def ChatView(page: ft.Page):
 
 				# Si le jour est différent du message précédent, on insère un badge de date
 				if message_date != last_date:
-					# date_divider = ft.Container(
-					# 	content=ft.Text(format_date(message_date), size=12, weight="bold"),
-					# 	alignment=ft.Alignment.CENTER,
-					# 	padding=ft.padding.symmetric(vertical=10),
-					# )
-
-					# Dans ChatView, au moment de créer le date_divider
 					date_divider = ft.Container(
 						content=ft.Text(format_date(message_date).upper(), size=11, weight="bold", color=ft.Colors.OUTLINE),
 						alignment=ft.Alignment.CENTER,
@@ -382,17 +380,13 @@ async def ChatView(page: ft.Page):
 			# await chat_list.scroll_to(offset=-1, duration=100)
 			# On affiche le message
 			# if first_load:
-			#     last_read = await storage.get(f"last_read_{current_room_id}")
-			#     if last_read:
-			#         # Flet permet de scroller vers une "key" spécifique
-			#         # await chat_list.scroll_to(key=str(last_read), duration=300)
-			#         pass
-			#     else:
-			#         pass
-			# Sinon, on va tout en bas
-			# await chat_list.scroll_to(offset=-1, duration=100)
-
-	# page.pubsub.subscribe(on_message)
+			# 	await asyncio.sleep(0.1)
+			# 	if last_read_id:
+			# 		page.run_task(chat_list.scroll_to, scroll_key=f"unread_{last_read_id}", duration=300)
+			# 		page.update()
+			# 	else:
+			# 		page.run_task(chat_list.scroll_to, offset=-1, duration=300)
+			# 		page.update()
 
 	async def left_room(e):
 		await show_quit_dialog(page, current_room_id)
