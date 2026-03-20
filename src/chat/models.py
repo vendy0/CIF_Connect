@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Optional, Union
 from datetime import datetime, date, time
 
 # =============================================================================
@@ -9,7 +9,7 @@ from datetime import datetime, date, time
 
 @dataclass
 class Message:
-    id: int
+    id: Union[int, str]
     pseudo: str
     content: str
     message_type: str
@@ -21,3 +21,5 @@ class Message:
     parent_content: Optional[str] = None
     parent_author: Optional[str] = None
     reactions: dict = field(default_factory=dict)
+    pending: bool = False # <-- Indique si le message est en attente
+    temp_id: Optional[str] = None # <-- ID temporaire pour le retrouver

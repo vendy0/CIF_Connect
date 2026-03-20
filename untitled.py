@@ -12,6 +12,7 @@
 # - Les notifs (Quand on se fait tag aussi)
 # - Désactiver l'auto scroll quand on remonte
 # - Mettre les messages en fil d'attente
+# - Charger plus que les 100 derniers messages
 
 
 

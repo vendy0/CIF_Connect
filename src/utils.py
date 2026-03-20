@@ -257,7 +257,7 @@ class Room:
 		self.page = page
 		self.id = room_id
 		self.name = name
-		self.icon = icon
+		self.icon = int(icon)
 		self.last_read_id = last_read_id
 
 		# Formater le sous-titre (Style WhatsApp)

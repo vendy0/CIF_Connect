@@ -5,12 +5,13 @@ from datetime import datetime, date, time, timedelta
 import httpx
 from chat.components import MyChatMessage, OtherChatMessage, SystemMessage
 from chat.models import Message
-from chat.api import fetch_room_messages, post_reaction, post_message, mark_room_messages_as_read
+from chat.api import fetch_room_messages, post_reaction, post_message_background, mark_room_messages_as_read
 from chat.dialogs import show_edit_dialog, show_delete_dialog, show_report_dialog, show_quit_dialog
 from utils import get_initials, get_avatar_color, get_colors, show_top_toast, format_date, copy_message
 import json
 import websockets
 import asyncio
+import uuid
 
 
 # =============================================================================
@@ -19,535 +20,606 @@ import asyncio
 
 
 async def ChatView(page: ft.Page):
-	storage = ft.SharedPreferences()
-	token = await storage.get("cif_token")
-	last_date = None
-
-	def build_empty_chat_view():
-		return ft.Container(
-			content=ft.Column(
-				[
-					ft.Icon(
-						icon=ft.Icons.CHAT_BUBBLE_OUTLINE_ROUNDED,
-						size=80,
-						color=ft.Colors.OUTLINE_VARIANT,
-					),
-					ft.Text(
-						"Le silence est d'or...",
-						size=20,
-						weight="bold",
-						color=ft.Colors.ON_SURFACE,
-					),
-					ft.Text(
-						"Soyez le premier à briser la glace !\nEnvoyez un message pour commencer la discussion.",
-						size=14,
-						color=ft.Colors.OUTLINE,
-						text_align=ft.TextAlign.CENTER,
-					),
-				],
-				horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-				spacing=10,
-			),
-			alignment=ft.Alignment.CENTER,
-			expand=True,
-			padding=ft.padding.only(top=200),
-		)
-
-	current_room_id = page.session.store.get("current_room_id") or 1
-	current_room_name = page.session.store.get("current_room_name") or "Salon Inconnue..."
-	last_read_id = page.session.store.get("last_read_id") or 0
-	current_pseudo = await storage.get("user_pseudo") or "Anonyme"
-
-	replying_to_message: Optional[Message] = None
-
-	if not current_room_id:
-		await show_top_toast(page, "Le salon est introuvable !", True)
-		await page.push_route("/rooms")
-		page.update()
-
-	if not token:
-		await page.push_route("/login")
-
-	chat_list = ft.ListView(expand=True, spacing=15, auto_scroll=True, padding=10)
-
-	# # 1. Création du container principal avec le Loader initial
-	# chm = ft.Container(
-	# 	content=ft.ProgressRing(),  # Ton loader
-	# 	expand=True,
-	# 	alignment=ft.Alignment.CENTER,
-	# )
-
-	async def refresh_ui():
-		# 1. Récupérer les nouveaux messages via ton module API
-		updated_messages = await fetch_room_messages(page, current_room_id)
-
-		if updated_messages is not None:
-			# 2. Vider la liste visuelle (ListView)
-			chat_list.controls.clear()
-
-			# 3. Relancer l'affichage (réutilise ta fonction show_messages existante)
-			await show_messages(updated_messages, first_load=False)
-
-			# 4. Mettre à jour l'interface
-			page.update()
-
-	chat_container = ft.Container(
-		content=ft.ProgressRing(),
-		alignment=ft.Alignment.CENTER,
-		expand=True,
-		image=ft.DecorationImage(
-			# src="icon.png",
-			src="pattern.png",
-			repeat=ft.ImageRepeat.REPEAT,
-			fit=ft.BoxFit.NONE,
-			opacity=0.4,  # Ton réglage de douceur
-		),
-		bgcolor=ft.Colors.SURFACE,
-	)
-
-	# On récupère les messages
-	messages_received = None
-
-	# 2. On définit la fonction de chargement
-	async def load_initial_data():
-		nonlocal messages_received
-		# Appel à ton nouveau fichier API
-		messages_received = await fetch_room_messages(page, current_room_id)
-
-		if messages_received is None:
-			# Si erreur (401 ou réseau), api.py a déjà fait le toast
-			# On redirige explicitement ici si ce n'est pas déjà fait
-			await page.push_route("/rooms")
-			return
-
-		is_chat_message = False
-		for m in messages_received:
-			if m["message_type"] == "chat":
-				is_chat_message = True
-				break
-
-		if not is_chat_message:
-			# Cas où il n'y a aucun message
-			chat_container.content = build_empty_chat_view()
-			page.update()
-		else:
-			# Cas où il y a des messages
-			await show_messages(messages_received, first_load=True)
-			chat_container.content = chat_list
-			# On retire l'alignement center pour que la liste commence en haut
-			chat_container.alignment = None
-			page.update()
-		# Si tout est OK, on affiche
-
-	# 3. On lance le chargement SANS bloquer l'affichage de la vue
-	page.run_task(load_initial_data)
-
-	reply_banner = ft.Container(
-		visible=False,
-		bgcolor="surfacevariant",
-		padding=10,
-		border_radius=ft.border_radius.only(top_left=15, top_right=15),
-		content=ft.Row(
-			alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-			controls=[
-				ft.Column(
-					spacing=0,
-					controls=[
-						ft.Text("Réponse à", size=11, color="primary"),
-						ft.Text("", size=13, italic=True, no_wrap=True),
-					],
-				),
-				ft.IconButton(
-					ft.Icons.CLOSE,
-					icon_size=16,
-					on_click=lambda e: e.page.run_task(cancel_reply, e),
-				),
-			],
-		),
-	)
-
-	def start_loading():
-		icon_send.content = ft.ProgressRing(width=20, height=20, stroke_width=2)
-		icon_send.disabled = True  # Évite les clics multiples
-		page.update()
-
-	def end_loading():
-		icon_send.content = ft.Container(content=ft.IconButton(icon=ft.Icons.SEND_ROUNDED, icon_color="blue", on_click=send_click))
-		icon_send.disabled = False
-		page.update()
-
-	new_message = ft.TextField(hint_text="Écrivez un message...", capitalization=ft.TextCapitalization.SENTENCES, autofocus=False, expand=True, multiline=True, min_lines=1, max_lines=5, border_radius=20)
-
-	async def go_to_rooms(e):
-		page.session.store.remove("current_room_id")
-		page.session.store.remove("current_room_name")
-		await page.push_route("/rooms")
-
-	async def cancel_reply(e):
-		nonlocal replying_to_message
-		replying_to_message = None
-		reply_banner.visible = False
-		reply_banner.content.controls[0].controls[1].value = ""
-		page.update()
-
-	async def prepare_reply(msg: Message):
-		nonlocal replying_to_message
-		await new_message.focus()
-		replying_to_message = msg
-		reply_banner.visible = True
-		reply_banner.content.controls[0].controls[1].value = f"{msg.pseudo}: {msg.content[:30]}..."
-		page.update()
-
-	async def edit_message(e, msg: Message):
-		page.pop_dialog()
-
-		# Callback de succès pour le dialogue
-		async def on_edit_done():
-			# On cherche le message dans la liste visuelle
-			for ctrl in chat_list.controls:
-				if hasattr(ctrl, "message") and ctrl.message.id == msg.id:
-					# 1. La donnée est déjà mise à jour par le dialog
-					# 2. On appelle la méthode de rafraîchissement du composant
-					if hasattr(ctrl, "update_ui"):
-						ctrl.update_ui()
-					else:
-						# Si tu n'as pas fait l'étape 1, le page.update()
-						# seul ne suffit pas car le contrôle ft.Text n'est pas lié
-						page.update()
-					break
-
-		await show_edit_dialog(page, msg, on_success=on_edit_done)
-
-	async def react_to_message(e, msg: Message):
-		# Liste de tes emojis supportés
-		emojis = ["👍", "❤️", "😂", "😮", "😢", "😡"]
-		emoji_selected = None
-
-		async def on_emoji_click(click_event, emoji_char):
-			# 1. Fermer le menu en priorité (Flet 0.80.5 style)
-			page.pop_dialog()
-			await post_reaction(page, msg.id, emoji_char)
-
-		# Construction de la grille d'emojis
-		emoji_row = ft.Row(
-			controls=[ft.TextButton(em, on_click=lambda ce, em=em: ce.page.run_task(on_emoji_click, ce, em)) for em in emojis],
-			alignment=ft.MainAxisAlignment.SPACE_EVENLY,
-		)
-
-		picker = ft.BottomSheet(content=ft.Container(content=emoji_row, padding=20, height=100))
-		page.show_dialog(picker)
-
-	async def report_message(e, msg: Message):
-		page.pop_dialog()
-		await show_report_dialog(page, msg.id)
-
-	async def delete_message(e, msg: Message):
-		page.pop_dialog()
-
-		async def on_delete_done():
-			# On filtre la liste pour enlever le message id
-			chat_list.controls = [m for m in chat_list.controls if not (hasattr(m, "message") and m.message.id == msg.id)]
-			page.update()
-
-		await show_delete_dialog(page, msg.id, on_success=on_delete_done)
-
-	async def send_click(e):
-		if not new_message.value.strip():
-			return
-
-		start_loading()
-
-		parent_id = replying_to_message.id if replying_to_message else None
-		await cancel_reply(None)
-		page.update()
-
-		message = await post_message(page, current_room_id, parent_id, new_message, on_success=end_loading)
-		if not message:
-			return
-
-		if chat_container.content != chat_list:
-			chat_container.content = chat_list
-			chat_container.alignment = None
-			page.update()
-
-
-		message_datetime = datetime.strptime(message["created_at"], "%Y-%m-%dT%H:%M:%S")
-		message_date = message_datetime.date()
-		message_time = message_datetime.time()
-
-	def on_message(message: Message, is_me):
-		async def scroll_to_parent(parent_key):
-			return
-			await chat_list.scroll_to(scroll_key=str(parent_key))
-			chat_list.update()
-			print("Est en train de scroll")
-			page.update()
-
-		if message.message_type in ["join", "quit"]:
-			chat_list.controls.append(SystemMessage(message))
-		elif message.message_type == "chat":
-			if is_me:
-				chat_list.controls.append(MyChatMessage(message=message, page=page, on_copy=copy_message, on_reply=prepare_reply, on_edit=edit_message, on_report=report_message, on_react=react_to_message, on_delete=delete_message))
-			else:
-				chat_list.controls.append(OtherChatMessage(message=message, page=page, on_copy=copy_message, on_reply=prepare_reply, on_edit=edit_message, on_report=report_message, on_react=react_to_message, on_delete=delete_message))
-		page.update()
-
-	async def show_messages(messages_received, first_load=False):
-		nonlocal chat_list, last_date, current_room_id, last_read_id
-		last_message_id = None
-
-		# On affiche les messages
-		if messages_received:
-			unread_divider_inserted = False
-			if isinstance(messages_received, dict):
-				messages_received = [messages_received]
-
-			for message_to_show in messages_received:
-				# On cherche s'il y a parent et le message et l'author du parent
-				parent_id = message_to_show["parent_id"]
-				parent_content = None
-				parent_author = None
-
-				parent_id = message_to_show.get("parent_id")
-
-				# Plus besoin de boucler ! Le backend fournit déjà ces infos
-				parent = message_to_show.get("parent")
-				if parent:
-					parent_content = parent.get("content")
-					parent_author = parent.get("author_display_name")
-
-				if parent_id and not parent_content:
-					parent_content = "Message supprimé !"
-					parent_author = "Auteur supprimé !"
-
-				message_datetime = datetime.strptime(message_to_show["created_at"], "%Y-%m-%dT%H:%M:%S")
-				message_date = message_datetime.date()
-
-				# --- AJOUT: Agrégation des réactions ---
-				raw_reactions = message_to_show.get("reactions", [])
-				reactions_counts = {}
-				for r in raw_reactions:
-					emj = r["emoji"]
-					reactions_counts[emj] = reactions_counts.get(emj, 0) + 1
-
-				me = Message(
-					id=message_to_show["id"],
-					pseudo=message_to_show["author_display_name"],
-					content=message_to_show["content"],
-					message_type=message_to_show["message_type"],
-					message_datetime=message_datetime,
-					message_date=message_date,
-					message_time=message_datetime.time(),
-					parent_id=parent_id,
-					modified=message_to_show["modified"],
-					parent_content=parent_content,
-					parent_author=parent_author,
-					reactions=reactions_counts,  # <--- On passe notre dictionnaire ici
-				)
-				if first_load and me.id > last_read_id and not unread_divider_inserted and last_read_id != 0:
-					unread_divider = ft.Container(
-						content=ft.Row(
-							[
-								ft.Divider(expand=True, color=ft.Colors.RED_400),
-								ft.Text("Nouveaux messages", size=12, color=ft.Colors.RED_400, weight="bold"),
-								ft.Divider(expand=True, color=ft.Colors.RED_400),
-							]
-						),
-						margin=ft.margin.symmetric(vertical=10),
-						key=f"unread_{last_read_id}",  # Une clé unique pour le saut
-					)
-					chat_list.controls.append(unread_divider)
-					# chat_list.auto_scroll = False
-					unread_divider_inserted = True
-
-				# Si le jour est différent du message précédent, on insère un badge de date
-				if message_date != last_date:
-					date_divider = ft.Container(
-						content=ft.Text(format_date(message_date).upper(), size=11, weight="bold", color=ft.Colors.OUTLINE),
-						alignment=ft.Alignment.CENTER,
-						bgcolor=ft.Colors.with_opacity(0.1, ft.Colors.ON_SURFACE_VARIANT),
-						padding=ft.padding.symmetric(horizontal=12, vertical=4),
-						border_radius=10,
-						margin=ft.margin.symmetric(vertical=10),
-					)
-
-					chat_list.controls.append(date_divider)
-					last_date = message_date
-				is_me = me.pseudo == current_pseudo
-				on_message(me, is_me)
-				last_message_id = me.id
-			page.run_task(mark_room_messages_as_read, page, current_room_id, last_message_id)
-			page.update()
-			# await chat_list.scroll_to(offset=-1, duration=100)
-			# On affiche le message
-			# if first_load:
-			# 	await asyncio.sleep(0.1)
-			# 	if last_read_id:
-			# 		page.run_task(chat_list.scroll_to, scroll_key=f"unread_{last_read_id}", duration=300)
-			# 		page.update()
-			# 	else:
-			# 		page.run_task(chat_list.scroll_to, offset=-1, duration=300)
-			# 		page.update()
-
-	async def left_room(e):
-		await show_quit_dialog(page, current_room_id)
-
-	search_input = ft.TextField(hint_text="Rechercher...", expand=True, autofocus=True, border=ft.InputBorder.NONE, on_change=lambda e: filter_messages(e.control.value))
-
-	def filter_messages(query: str):
-		query = query.lower()
-		# On parcourt les éléments de la chat_list
-		for ctrl in chat_list.controls:
-			if isinstance(ctrl, (MyChatMessage, OtherChatMessage)):
-				# Si le texte correspond, on affiche, sinon on cache
-				ctrl.visible = query in ctrl.message.content.lower()
-		page.update()
-
-	def toggle_search(e):
-		# On remplace le titre par l'input, et on change les boutons
-		if app_bar.title == search_input:
-			# Annuler la recherche
-			app_bar.title = ft.Row(controls=ft.Text(current_room_name, size=20, weight="bold"))
-			app_bar.actions = [default_menu]
-			filter_messages("")  # On réaffiche tout
-		else:
-			# Activer la recherche
-			app_bar.title = search_input
-			app_bar.actions = [ft.IconButton(ft.Icons.CLOSE, on_click=toggle_search)]
-		page.update()
-
-	default_menu = ft.PopupMenuButton(
-		items=[
-			ft.PopupMenuItem(icon=ft.Icons.SEARCH, content=ft.Text("Rechercher un message"), on_click=toggle_search),
-		]
-	)
-
-	if current_room_id != 1 and current_room_name != "Salon Général":
-		default_menu.items.append(ft.PopupMenuItem())
-		default_menu.items.append(ft.PopupMenuItem(icon=ft.Icons.LOGOUT_ROUNDED, content=ft.Text("Quitter le salon"), on_click=left_room))
-
-	app_bar = ft.AppBar(
-		# --- BOUTON RETOUR ---
-		leading=ft.IconButton(icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, on_click=lambda _: page.run_task(page.push_route, "/rooms")),
-		leading_width=40,
-		# --- TITRE CLIQUABLE (Pour les infos du salon) ---
-		title=ft.GestureDetector(
-			on_long_press=toggle_search,
-			content=ft.Text(current_room_name, size=20, weight="bold", color="onsurface"),
-			on_tap=lambda _: page.run_task(page.push_route, f"/room_info/{current_room_id}"),  # On verra cette vue plus bas
-		),
-		center_title=False,
-		bgcolor="surface",
-		elevation=2,
-		# --- MENU 3 POINTS ---
-		actions=[default_menu],
-	)
-
-	icon_send = ft.Container(content=ft.IconButton(icon=ft.Icons.SEND_ROUNDED, icon_color="blue", on_click=send_click))
-
-	# Variable pour garder la main sur la connexion
-	ws_connection = None
-
-	async def listen_ws():
-		nonlocal current_room_id, ws_connection
-		ws_url = f"ws://127.0.0.1:8000/ws/{current_room_id}"
-
-		try:
-			async with websockets.connect(ws_url) as ws:
-				ws_connection = ws
-				async for data in ws:
-					msg_data = json.loads(data)
-					action_type = msg_data.get("action", "new")  # Supposons que ton API envoie l'action
-
-					if action_type == "delete":
-						# On supprime visuellement sans recharger
-						chat_list.controls = [m for m in chat_list.controls if not (hasattr(m, "message") and m.message.id == msg_data["id"])]
-						page.update()
-
-					elif action_type == "edit":
-						# On modifie visuellement
-						for m in chat_list.controls:
-							if hasattr(m, "message") and m.message.id == msg_data["id"]:
-								m.message.content = msg_data["content"]
-								m.message.modified = True
-								if hasattr(m, "update_ui"):
-									m.update_ui()
-								break
-					elif action_type == "react":
-						# Recalculer les réactions reçues
-						reactions_counts = {}
-						for r in msg_data.get("reactions", []):
-							emj = r["emoji"]
-							reactions_counts[emj] = reactions_counts.get(emj, 0) + 1
-
-						# Mettre à jour la bulle ciblée
-						for m in chat_list.controls:
-							if hasattr(m, "message") and m.message.id == msg_data["id"]:
-								m.message.reactions = reactions_counts
-								# On appelle la nouvelle fonction créée à l'étape 2
-								if hasattr(m, "update_reactions"):
-									m.update_reactions()
-								break
-					else:
-						# Formatage des réactions
-						reactions_counts = {}
-						for r in msg_data.get("reactions", []):
-							emj = r["emoji"]
-							reactions_counts[emj] = reactions_counts.get(emj, 0) + 1
-
-						message_datetime = datetime.strptime(msg_data["created_at"], "%Y-%m-%dT%H:%M:%S")
-
-						new_msg = Message(
-							id=msg_data["id"],
-							pseudo=msg_data["author_display_name"],
-							content=msg_data["content"],
-							message_type=msg_data["message_type"],
-							modified=msg_data.get("modified", False),
-							parent_id=msg_data.get("parent_id"),
-							parent_content=msg_data.get("parent_content"),
-							parent_author=msg_data.get("parent_author"),
-							message_datetime=message_datetime,
-							message_date=message_datetime.date(),
-							message_time=message_datetime.time(),
-							reactions=reactions_counts,
-						)
-
-						# Vérification doublon
-						# 	existing_ids = [m.content[0].key for m in chat_list.controls if hasattr(m.content[0], "key")]
-						existing_ids = [str(m.message.id) for m in chat_list.controls if hasattr(m, "message")]
-						if str(new_msg.id) not in existing_ids:
-							is_me = new_msg.pseudo == current_pseudo
-							on_message(new_msg, is_me)
-							page.run_task(mark_room_messages_as_read, page, current_room_id, new_msg.id)
-					page.update()
-
-		except websockets.exceptions.ConnectionClosed:
-			# Comportement normal quand on force la fermeture
-			print(f"Déconnexion du salon {current_room_id}")
-
-	# Lancement en tâche de fond (ne bloque pas l'UI)
-	page.run_task(listen_ws)
-
-	return ft.View(
-		route="/chat",
-		controls=[
-			app_bar,
-			# Le Stack entoure la liste ET le bouton
-			ft.Container(
-				content=chat_container,
-				expand=True,
-				padding=0,
-			),
-			# La zone de saisie en bas (reply_banner + new_message)
-			ft.Container(
-				content=ft.Column(
-					spacing=0,
-					controls=[
-						reply_banner,
-						ft.Row([new_message, icon_send]),
-					],
-				),
-				padding=ft.padding.Padding(left=10, top=5, right=10, bottom=15),
-			),
-		],
-	)
+    storage = ft.SharedPreferences()
+    token = await storage.get("cif_token")
+    last_date = None
+
+    def build_empty_chat_view():
+        return ft.Container(
+            content=ft.Column(
+                [
+                    ft.Icon(
+                        icon=ft.Icons.CHAT_BUBBLE_OUTLINE_ROUNDED,
+                        size=80,
+                        color=ft.Colors.OUTLINE_VARIANT,
+                    ),
+                    ft.Text(
+                        "Le silence est d'or...",
+                        size=20,
+                        weight="bold",
+                        color=ft.Colors.ON_SURFACE,
+                    ),
+                    ft.Text(
+                        "Soyez le premier à briser la glace !\nEnvoyez un message pour commencer la discussion.",
+                        size=14,
+                        color=ft.Colors.OUTLINE,
+                        text_align=ft.TextAlign.CENTER,
+                    ),
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=10,
+            ),
+            alignment=ft.Alignment.CENTER,
+            expand=True,
+            padding=ft.padding.only(top=200),
+        )
+
+    current_room_id = page.session.store.get("current_room_id") or 1
+    current_room_name = page.session.store.get("current_room_name") or "Salon Inconnue..."
+    last_read_id = page.session.store.get("last_read_id") or 0
+    current_pseudo = await storage.get("user_pseudo") or "Anonyme"
+
+    replying_to_message: Optional[Message] = None
+
+    if not current_room_id:
+        await show_top_toast(page, "Le salon est introuvable !", True)
+        await page.push_route("/rooms")
+        page.update()
+
+    if not token:
+        await page.push_route("/login")
+
+    chat_list = ft.ListView(expand=True, spacing=15, auto_scroll=True, padding=10)
+
+    # # 1. Création du container principal avec le Loader initial
+    # chm = ft.Container(
+    # 	content=ft.ProgressRing(),  # Ton loader
+    # 	expand=True,
+    # 	alignment=ft.Alignment.CENTER,
+    # )
+
+    async def refresh_ui():
+        # 1. Récupérer les nouveaux messages via ton module API
+        updated_messages = await fetch_room_messages(page, current_room_id)
+
+        if updated_messages is not None:
+            # 2. Vider la liste visuelle (ListView)
+            chat_list.controls.clear()
+
+            # 3. Relancer l'affichage (réutilise ta fonction show_messages existante)
+            await show_messages(updated_messages, first_load=False)
+
+            # 4. Mettre à jour l'interface
+            page.update()
+
+    chat_container = ft.Container(
+        content=ft.ProgressRing(),
+        alignment=ft.Alignment.CENTER,
+        expand=True,
+        image=ft.DecorationImage(
+            # src="icon.png",
+            src="pattern.png",
+            repeat=ft.ImageRepeat.REPEAT,
+            fit=ft.BoxFit.NONE,
+            opacity=0.4,  # Ton réglage de douceur
+        ),
+        bgcolor=ft.Colors.SURFACE,
+    )
+
+    # On récupère les messages
+    messages_received = None
+
+    # 2. On définit la fonction de chargement
+    async def load_initial_data():
+        nonlocal messages_received
+        # Appel à ton nouveau fichier API
+        messages_received = await fetch_room_messages(page, current_room_id)
+
+        if messages_received is None:
+            # Si erreur (401 ou réseau), api.py a déjà fait le toast
+            # On redirige explicitement ici si ce n'est pas déjà fait
+            await page.push_route("/rooms")
+            return
+
+        is_chat_message = False
+        for m in messages_received:
+            if m["message_type"] == "chat":
+                is_chat_message = True
+                break
+
+        if not is_chat_message:
+            # Cas où il n'y a aucun message
+            chat_container.content = build_empty_chat_view()
+            page.update()
+        else:
+            # Cas où il y a des messages
+            await show_messages(messages_received, first_load=True)
+            chat_container.content = chat_list
+            # On retire l'alignement center pour que la liste commence en haut
+            chat_container.alignment = None
+            page.update()
+        # Si tout est OK, on affiche
+
+    # 3. On lance le chargement SANS bloquer l'affichage de la vue
+    page.run_task(load_initial_data)
+
+    reply_banner = ft.Container(
+        visible=False,
+        bgcolor="surfacevariant",
+        padding=10,
+        border_radius=ft.border_radius.only(top_left=15, top_right=15),
+        content=ft.Row(
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            controls=[
+                ft.Column(
+                    spacing=0,
+                    controls=[
+                        ft.Text("Réponse à", size=11, color="primary"),
+                        ft.Text("", size=13, italic=True, no_wrap=True),
+                    ],
+                ),
+                ft.IconButton(
+                    ft.Icons.CLOSE,
+                    icon_size=16,
+                    on_click=lambda e: e.page.run_task(cancel_reply, e),
+                ),
+            ],
+        ),
+    )
+
+    new_message = ft.TextField(
+        hint_text="Écrivez un message...", capitalization=ft.TextCapitalization.SENTENCES, autofocus=False, expand=True, multiline=True, min_lines=1, max_lines=5, border_radius=20
+    )
+
+    async def go_to_rooms(e):
+        page.session.store.remove("current_room_id")
+        page.session.store.remove("current_room_name")
+        await page.push_route("/rooms")
+
+    async def cancel_reply(e):
+        nonlocal replying_to_message
+        replying_to_message = None
+        reply_banner.visible = False
+        reply_banner.content.controls[0].controls[1].value = ""
+        page.update()
+
+    async def prepare_reply(msg: Message):
+        nonlocal replying_to_message
+        await new_message.focus()
+        replying_to_message = msg
+        reply_banner.visible = True
+        reply_banner.content.controls[0].controls[1].value = f"{msg.pseudo}: {msg.content[:30]}..."
+        page.update()
+
+    async def edit_message(e, msg: Message):
+        page.pop_dialog()
+
+        # Callback de succès pour le dialogue
+        async def on_edit_done():
+            # On cherche le message dans la liste visuelle
+            for ctrl in chat_list.controls:
+                if hasattr(ctrl, "message") and ctrl.message.id == msg.id:
+                    # 1. La donnée est déjà mise à jour par le dialog
+                    # 2. On appelle la méthode de rafraîchissement du composant
+                    if hasattr(ctrl, "update_ui"):
+                        ctrl.update_ui()
+                    else:
+                        # Si tu n'as pas fait l'étape 1, le page.update()
+                        # seul ne suffit pas car le contrôle ft.Text n'est pas lié
+                        page.update()
+                    break
+
+        await show_edit_dialog(page, msg, on_success=on_edit_done)
+
+    async def react_to_message(e, msg: Message):
+        # Liste de tes emojis supportés
+        emojis = ["👍", "❤️", "😂", "😮", "😢", "😡"]
+        emoji_selected = None
+
+        async def on_emoji_click(click_event, emoji_char):
+            # 1. Fermer le menu en priorité (Flet 0.80.5 style)
+            page.pop_dialog()
+            await post_reaction(page, msg.id, emoji_char)
+
+        # Construction de la grille d'emojis
+        emoji_row = ft.Row(
+            controls=[ft.TextButton(em, on_click=lambda ce, em=em: ce.page.run_task(on_emoji_click, ce, em)) for em in emojis],
+            alignment=ft.MainAxisAlignment.SPACE_EVENLY,
+        )
+
+        picker = ft.BottomSheet(content=ft.Container(content=emoji_row, padding=20, height=100))
+        page.show_dialog(picker)
+
+    async def report_message(e, msg: Message):
+        page.pop_dialog()
+        await show_report_dialog(page, msg.id)
+
+    async def delete_message(e, msg: Message):
+        page.pop_dialog()
+
+        async def on_delete_done():
+            # On filtre la liste pour enlever le message id
+            chat_list.controls = [m for m in chat_list.controls if not (hasattr(m, "message") and m.message.id == msg.id)]
+            page.update()
+
+        await show_delete_dialog(page, msg.id, on_success=on_delete_done)
+
+    # 	async def send_click(e):
+    # 		if not new_message.value.strip():
+    # 			return
+
+    # 		parent_id = replying_to_message.id if replying_to_message else None
+    # 		await cancel_reply(None)
+    # 		page.update()
+
+    # 		message = await post_message_background(page, current_room_id, parent_id, new_message)
+    # 		if not message:
+    # 			return
+
+    # 		if chat_container.content != chat_list:
+    # 			chat_container.content = chat_list
+    # 			chat_container.alignment = None
+    # 			page.update()
+
+    # 		message_datetime = datetime.strptime(message["created_at"], "%Y-%m-%dT%H:%M:%S")
+    # 		message_date = message_datetime.date()
+    # 		message_time = message_datetime.time()
+
+    async def send_click(e):
+        content = new_message.value.strip()
+        if not content:
+            return
+
+        parent_id = replying_to_message.id if replying_to_message else None
+
+        # 1. On nettoie tout de suite l'interface
+        new_message.value = ""
+        await cancel_reply(None)
+        page.update()
+
+        # 2. Création du message temporaire
+        temp_id = str(uuid.uuid4())
+        now = datetime.now()
+
+        temp_msg = Message(
+            id=temp_id,  # ID factice
+            temp_id=temp_id,
+            pseudo=current_pseudo,
+            content=content,
+            message_type="chat",
+            modified=False,
+            message_datetime=now,
+            message_date=now.date(),
+            message_time=now.time(),
+            parent_id=parent_id,
+            parent_content=replying_to_message.content if replying_to_message else None,
+            parent_author=replying_to_message.pseudo if replying_to_message else None,
+            pending=True,  # <--- Activer le loader
+        )
+
+        # 3. Affichage immédiat
+        on_message(temp_msg, is_me=True)
+        page.run_task(chat_list.scroll_to, offset=-1, duration=300)
+
+        # 4. Tâche d'envoi en arrière-plan
+        async def background_task(msg_content, p_id, t_id):
+            from chat.api import post_message_background  # Assure-toi de l'importer
+
+            real_data = await post_message_background(page, current_room_id, p_id, msg_content)
+
+            # Si le composant ChatList est toujours actif (l'utilisateur n'a pas quitté l'app)
+            # if chat_list.page:
+            if real_data:
+                # Succès : on trouve le message temporaire et on le valide
+                for ctrl in chat_list.controls:
+                    if hasattr(ctrl, "message") and getattr(ctrl.message, "temp_id", None) == t_id:
+                        ctrl.message.id = real_data["id"]  # Vrai ID de la BDD
+                        ctrl.message.pending = False
+                        ctrl.message.temp_id = None
+                        if hasattr(ctrl, "update_status"):
+                            ctrl.update_status()
+                        break
+            else:
+                # Échec : on supprime le message fantôme et on prévient
+                chat_list.controls = [c for c in chat_list.controls if not (hasattr(c, "message") and getattr(c.message, "temp_id", None) == t_id)]
+                page.update()
+                await show_top_toast(page, "Erreur réseau, message non envoyé !", True)
+
+        # Lancement sans bloquer
+        page.run_task(background_task, content, parent_id, temp_id)
+
+    def on_message(message: Message, is_me):
+        async def scroll_to_parent(parent_key):
+            return
+            await chat_list.scroll_to(scroll_key=str(parent_key))
+            chat_list.update()
+            print("Est en train de scroll")
+            page.update()
+
+        if message.message_type in ["join", "quit"]:
+            chat_list.controls.append(SystemMessage(message))
+        elif message.message_type == "chat":
+            if is_me:
+                chat_list.controls.append(
+                    MyChatMessage(
+                        message=message, page=page, on_copy=copy_message, on_reply=prepare_reply, on_edit=edit_message, on_report=report_message, on_react=react_to_message, on_delete=delete_message
+                    )
+                )
+            else:
+                chat_list.controls.append(
+                    OtherChatMessage(
+                        message=message, page=page, on_copy=copy_message, on_reply=prepare_reply, on_edit=edit_message, on_report=report_message, on_react=react_to_message, on_delete=delete_message
+                    )
+                )
+        page.update()
+
+    async def show_messages(messages_received, first_load=False):
+        nonlocal chat_list, last_date, current_room_id, last_read_id
+        last_message_id = None
+
+        # On affiche les messages
+        if messages_received:
+            unread_divider_inserted = False
+            if isinstance(messages_received, dict):
+                messages_received = [messages_received]
+
+            for message_to_show in messages_received:
+                # On cherche s'il y a parent et le message et l'author du parent
+                parent_id = message_to_show["parent_id"]
+                parent_content = None
+                parent_author = None
+
+                parent_id = message_to_show.get("parent_id")
+
+                # Plus besoin de boucler ! Le backend fournit déjà ces infos
+                parent = message_to_show.get("parent")
+                if parent:
+                    parent_content = parent.get("content")
+                    parent_author = parent.get("author_display_name")
+
+                if parent_id and not parent_content:
+                    parent_content = "Message supprimé !"
+                    parent_author = "Auteur supprimé !"
+
+                message_datetime = datetime.strptime(message_to_show["created_at"], "%Y-%m-%dT%H:%M:%S")
+                message_date = message_datetime.date()
+
+                # --- AJOUT: Agrégation des réactions ---
+                raw_reactions = message_to_show.get("reactions", [])
+                reactions_counts = {}
+                for r in raw_reactions:
+                    emj = r["emoji"]
+                    reactions_counts[emj] = reactions_counts.get(emj, 0) + 1
+
+                me = Message(
+                    id=message_to_show["id"],
+                    pseudo=message_to_show["author_display_name"],
+                    content=message_to_show["content"],
+                    message_type=message_to_show["message_type"],
+                    message_datetime=message_datetime,
+                    message_date=message_date,
+                    message_time=message_datetime.time(),
+                    parent_id=parent_id,
+                    modified=message_to_show["modified"],
+                    parent_content=parent_content,
+                    parent_author=parent_author,
+                    reactions=reactions_counts,  # <--- On passe notre dictionnaire ici
+                )
+                if first_load and me.id > last_read_id and not unread_divider_inserted and last_read_id != 0:
+                    unread_divider = ft.Container(
+                        content=ft.Row(
+                            [
+                                ft.Divider(expand=True, color=ft.Colors.RED_400),
+                                ft.Text("Nouveaux messages", size=12, color=ft.Colors.RED_400, weight="bold"),
+                                ft.Divider(expand=True, color=ft.Colors.RED_400),
+                            ]
+                        ),
+                        margin=ft.margin.symmetric(vertical=10),
+                        key=f"unread_{last_read_id}",  # Une clé unique pour le saut
+                    )
+                    chat_list.controls.append(unread_divider)
+                    # chat_list.auto_scroll = False
+                    unread_divider_inserted = True
+
+                # Si le jour est différent du message précédent, on insère un badge de date
+                if message_date != last_date:
+                    date_divider = ft.Container(
+                        content=ft.Text(format_date(message_date).upper(), size=11, weight="bold", color=ft.Colors.OUTLINE),
+                        alignment=ft.Alignment.CENTER,
+                        bgcolor=ft.Colors.with_opacity(0.1, ft.Colors.ON_SURFACE_VARIANT),
+                        padding=ft.padding.symmetric(horizontal=12, vertical=4),
+                        border_radius=10,
+                        margin=ft.margin.symmetric(vertical=10),
+                    )
+
+                    chat_list.controls.append(date_divider)
+                    last_date = message_date
+                is_me = me.pseudo == current_pseudo
+                on_message(me, is_me)
+                last_message_id = me.id
+            page.run_task(mark_room_messages_as_read, page, current_room_id, last_message_id)
+            page.update()
+            # await chat_list.scroll_to(offset=-1, duration=100)
+            # On affiche le message
+            # if first_load:
+            # 	await asyncio.sleep(0.1)
+            # 	if last_read_id:
+            # 		page.run_task(chat_list.scroll_to, scroll_key=f"unread_{last_read_id}", duration=300)
+            # 		page.update()
+            # 	else:
+            # 		page.run_task(chat_list.scroll_to, offset=-1, duration=300)
+            # 		page.update()
+
+    async def left_room(e):
+        await show_quit_dialog(page, current_room_id)
+
+    search_input = ft.TextField(hint_text="Rechercher...", expand=True, autofocus=True, border=ft.InputBorder.NONE, on_change=lambda e: filter_messages(e.control.value))
+
+    def filter_messages(query: str):
+        query = query.lower()
+        # On parcourt les éléments de la chat_list
+        for ctrl in chat_list.controls:
+            if isinstance(ctrl, (MyChatMessage, OtherChatMessage)):
+                # Si le texte correspond, on affiche, sinon on cache
+                ctrl.visible = query in ctrl.message.content.lower()
+        page.update()
+
+    def toggle_search(e):
+        # On remplace le titre par l'input, et on change les boutons
+        if app_bar.title == search_input:
+            # Annuler la recherche
+            app_bar.title = ft.Row(controls=ft.Text(current_room_name, size=20, weight="bold"))
+            app_bar.actions = [default_menu]
+            filter_messages("")  # On réaffiche tout
+        else:
+            # Activer la recherche
+            app_bar.title = search_input
+            app_bar.actions = [ft.IconButton(ft.Icons.CLOSE, on_click=toggle_search)]
+        page.update()
+
+    default_menu = ft.PopupMenuButton(
+        items=[
+            ft.PopupMenuItem(icon=ft.Icons.SEARCH, content=ft.Text("Rechercher un message"), on_click=toggle_search),
+        ]
+    )
+
+    if current_room_id != 1 and current_room_name != "Salon Général":
+        default_menu.items.append(ft.PopupMenuItem())
+        default_menu.items.append(ft.PopupMenuItem(icon=ft.Icons.LOGOUT_ROUNDED, content=ft.Text("Quitter le salon"), on_click=left_room))
+
+    app_bar = ft.AppBar(
+        # --- BOUTON RETOUR ---
+        leading=ft.IconButton(icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, on_click=lambda _: page.run_task(page.push_route, "/rooms")),
+        leading_width=40,
+        # --- TITRE CLIQUABLE (Pour les infos du salon) ---
+        title=ft.GestureDetector(
+            on_long_press=toggle_search,
+            content=ft.Text(current_room_name, size=20, weight="bold", color="onsurface"),
+            on_tap=lambda _: page.run_task(page.push_route, f"/room_info/{current_room_id}"),  # On verra cette vue plus bas
+        ),
+        center_title=False,
+        bgcolor="surface",
+        elevation=2,
+        # --- MENU 3 POINTS ---
+        actions=[default_menu],
+    )
+
+    icon_send = ft.Container(content=ft.IconButton(icon=ft.Icons.SEND_ROUNDED, icon_color="blue", on_click=send_click))
+
+    # Variable pour garder la main sur la connexion
+    ws_connection = None
+
+    async def listen_ws():
+        nonlocal current_room_id, ws_connection
+        ws_url = f"ws://127.0.0.1:8000/ws/{current_room_id}"
+
+        try:
+            async with websockets.connect(ws_url) as ws:
+                ws_connection = ws
+                async for data in ws:
+                    msg_data = json.loads(data)
+                    action_type = msg_data.get("action", "new")  # Supposons que ton API envoie l'action
+
+                    if action_type == "delete":
+                        # On supprime visuellement sans recharger
+                        chat_list.controls = [m for m in chat_list.controls if not (hasattr(m, "message") and m.message.id == msg_data["id"])]
+                        page.update()
+
+                    elif action_type == "edit":
+                        # On modifie visuellement
+                        for m in chat_list.controls:
+                            if hasattr(m, "message") and m.message.id == msg_data["id"]:
+                                m.message.content = msg_data["content"]
+                                m.message.modified = True
+                                if hasattr(m, "update_ui"):
+                                    m.update_ui()
+                                break
+                    elif action_type == "react":
+                        # Recalculer les réactions reçues
+                        reactions_counts = {}
+                        for r in msg_data.get("reactions", []):
+                            emj = r["emoji"]
+                            reactions_counts[emj] = reactions_counts.get(emj, 0) + 1
+
+                        # Mettre à jour la bulle ciblée
+                        for m in chat_list.controls:
+                            if hasattr(m, "message") and m.message.id == msg_data["id"]:
+                                m.message.reactions = reactions_counts
+                                # On appelle la nouvelle fonction créée à l'étape 2
+                                if hasattr(m, "update_reactions"):
+                                    m.update_reactions()
+                                break
+                    else:
+                        # Formatage des réactions
+                        reactions_counts = {}
+                        for r in msg_data.get("reactions", []):
+                            emj = r["emoji"]
+                            reactions_counts[emj] = reactions_counts.get(emj, 0) + 1
+
+                        message_datetime = datetime.strptime(msg_data["created_at"], "%Y-%m-%dT%H:%M:%S")
+                        new_msg = Message(
+                            id=msg_data["id"],
+                            pseudo=msg_data["author_display_name"],
+                            content=msg_data["content"],
+                            message_type=msg_data["message_type"],
+                            modified=msg_data.get("modified", False),
+                            parent_id=msg_data.get("parent_id"),
+                            parent_content=msg_data.get("parent_content"),
+                            parent_author=msg_data.get("parent_author"),
+                            message_datetime=message_datetime,
+                            message_date=message_datetime.date(),
+                            message_time=message_datetime.time(),
+                            reactions=reactions_counts,
+                        )
+
+                        # Vérification doublon et Update WebSocket First
+                        page.run_task(mark_room_messages_as_read, page, current_room_id, new_msg.id)
+                        existing_ids = [str(m.message.id) for m in chat_list.controls if hasattr(m, "message")]
+                        if str(new_msg.id) not in existing_ids:
+                            # Sécurité : vérifier si ce n'est pas un message qu'on vient juste d'envoyer
+                            # et que le WS est arrivé plus vite que la réponse HTTP.
+                            duplicate_temp = next((m for m in chat_list.controls if hasattr(m, "message") and getattr(m.message, "pending", False) and m.message.content == new_msg.content), None)
+
+                            if duplicate_temp:
+                                # Le WS a été plus rapide ! On met à jour la bulle existante
+                                duplicate_temp.message.id = new_msg.id
+                                duplicate_temp.message.pending = False
+                                duplicate_temp.message.temp_id = None
+                                if hasattr(duplicate_temp, "update_status"):
+                                    duplicate_temp.update_status()
+                            else:
+                                # C'est un vrai nouveau message d'un tiers
+                                is_me = new_msg.pseudo == current_pseudo
+                                on_message(new_msg, is_me)
+                    page.update()
+
+        except websockets.exceptions.ConnectionClosed:
+            # Comportement normal quand on force la fermeture
+            print(f"Déconnexion du salon {current_room_id}")
+
+    # Lancement en tâche de fond (ne bloque pas l'UI)
+    page.run_task(listen_ws)
+
+    return ft.View(
+        route="/chat",
+        controls=[
+            app_bar,
+            # Le Stack entoure la liste ET le bouton
+            ft.Container(
+                content=chat_container,
+                expand=True,
+                padding=0,
+            ),
+            # La zone de saisie en bas (reply_banner + new_message)
+            ft.Container(
+                content=ft.Column(
+                    spacing=0,
+                    controls=[
+                        reply_banner,
+                        ft.Row([new_message, icon_send]),
+                    ],
+                ),
+                padding=ft.padding.Padding(left=10, top=5, right=10, bottom=15),
+            ),
+        ],
+    )
