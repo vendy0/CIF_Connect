@@ -86,6 +86,7 @@ async def post_report(page, msg_id, report_reason_input):
             page.update()
             return False
 
+        page.pop_dialog()
         await show_top_toast(page, "Signalement envoyé à la modération.")
         return True
 
@@ -145,6 +146,7 @@ async def delete_message_bdd(page, msg_id):
 # 		if on_success:
 # 			on_success()
 # 			page.update
+
 
 async def post_message_background(page, room_id, parent_id, content):
     """Envoi silencieux en tâche de fond pour l'UI optimiste"""

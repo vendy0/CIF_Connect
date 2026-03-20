@@ -148,7 +148,7 @@ class RoomSchema(BaseModel):
     name: str
     description: str
     access_key: Optional[str]
-    icon: str
+    icon: int
     created_at: datetime
     creator: Optional[UserMinimalSchema]
 
@@ -167,7 +167,7 @@ class CreateRoomSchema(BaseModel):
 
     name: str
     description: str
-    icon: str
+    icon: int
     access_key: Optional[str] = None  # Optionnel si public
 
 
@@ -180,7 +180,7 @@ class RoomUpdateSchema(BaseModel):
 
     name: Optional[str] = None
     description: Optional[str] = None
-    icon: Optional[str] = None
+    icon: Optional[int] = None
     access_key: Optional[str] = None
 
 

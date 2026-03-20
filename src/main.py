@@ -4,6 +4,7 @@ from chat_view import ChatView
 from settings_view import SettingsView
 from rooms_view import RoomsView
 from create_room_view import CreateRoomView
+from admin_view import AdminView
 from room_info_view import RoomInfoView
 from utils import generer_pseudo, view_pop, decode_token, api
 # import asyncio
@@ -35,6 +36,8 @@ async def main(page: ft.Page):
             page.views.append(await SettingsView(page))
         elif page.route == "/new_room":
             page.views.append(await CreateRoomView(page))
+        elif page.route == "/admin":
+            page.views.append(await AdminView(page))
         else:
             page.views.append(await LoginView(page))
         page.update()
@@ -50,7 +53,7 @@ async def main(page: ft.Page):
 
         api.set_token(token)
 
-        await page.push_route("/rooms")
+        await page.push_route("/admin")
     else:
         await page.push_route("/login")
 
