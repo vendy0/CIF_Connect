@@ -26,7 +26,9 @@ async def SettingsView(page: ft.Page):
 
     def toggle_theme(e):
         page.theme_mode = ft.ThemeMode.DARK if page.theme_mode == ft.ThemeMode.LIGHT else ft.ThemeMode.LIGHT
+        icon_theme = ft.Icons.DARK_MODE if page.theme_mode == ft.ThemeMode.LIGHT else ft.Icons.LIGHT_MODE
         theme_icon.icon = ft.Icons.DARK_MODE if page.theme_mode == ft.ThemeMode.LIGHT else ft.Icons.LIGHT_MODE
+        page.run_task(storage.set, "theme_pref", page.theme_mode.value)
         page.update()
 
     theme_icon = ft.IconButton(

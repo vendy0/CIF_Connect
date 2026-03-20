@@ -14,7 +14,8 @@ print(" =============== LANCEMENT DE FLET =============== ")
 async def main(page: ft.Page):
     storage = ft.SharedPreferences()
     page.title = "CIF Connect"
-    page.theme_mode = ft.ThemeMode.SYSTEM
+    saved_theme = await storage.get("theme_pref")
+    page.theme_mode = ft.ThemeMode(saved_theme) if saved_theme else ft.ThemeMode.SYSTEM
 
     # ---- ROUTE CHANGE ----
     async def route_change():  # e : ft.RouteChangeEvent):

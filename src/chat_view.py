@@ -268,6 +268,7 @@ async def ChatView(page: ft.Page):
 		if chat_container.content != chat_list:
 			chat_container.content = chat_list
 			chat_container.alignment = None
+			page.update()
 
 
 		message_datetime = datetime.strptime(message["created_at"], "%Y-%m-%dT%H:%M:%S")
