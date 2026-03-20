@@ -24,7 +24,7 @@ async def view_pop(view, page):
 
 def generate_secure_code():
     caracteres = string.ascii_letters + string.digits
-    return "".join(secrets.choice(caracteres) for _ in range(4))
+    return "".join(secrets.choice(caracteres) for _ in range(10))
 
 
 async def decode_token(token):

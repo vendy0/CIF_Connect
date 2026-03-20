@@ -383,7 +383,9 @@ class MyChatMessage(BaseChatMessage):
 				leading=ft.Icon(ft.Icons.DELETE_OUTLINE, color="error"),
 				title=ft.Text("Supprimer"),
 				on_click=lambda e: self._page_ref.run_task(self.on_delete, e, self.message),
-			),
+			)
+			if (datetime.now() - timedelta(days=3)) < self.message.message_datetime
+			else ft.Container(),
 			ft.ListTile(
 				leading=ft.Icon(ft.Icons.REPLY),
 				title=ft.Text("Répondre"),
@@ -845,7 +847,6 @@ async def ChatView(page: ft.Page):
 		page.show_dialog(report_dialog)
 
 	async def delete_message(e, msg: Message):
-
 		async def cancel_delete(e):
 			page.pop_dialog()
 
@@ -866,7 +867,7 @@ async def ChatView(page: ft.Page):
 				await show_top_toast(page, "Erreur lors de la suppression !", True)
 				page.update()
 				return
-			
+
 		page.pop_dialog()
 		dlg = ft.AlertDialog(
 			content=ft.Text("Voulez vous vraiment supprimer ce message ?"),
@@ -877,11 +878,11 @@ async def ChatView(page: ft.Page):
 		)
 		page.show_dialog(dlg)
 
-			# except Exception as e:
-			#     # En cas de problème réseau par exemple
-			#     await show_top_toast(page, "Erreur de connexion !", True)
-			#     print(f"Erreur connexion {e}")
-			#     return
+		# except Exception as e:
+		#     # En cas de problème réseau par exemple
+		#     await show_top_toast(page, "Erreur de connexion !", True)
+		#     print(f"Erreur connexion {e}")
+		#     return
 
 	async def send_click(e):
 		if not new_message.value.strip():
