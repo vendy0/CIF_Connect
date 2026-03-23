@@ -50,12 +50,22 @@ async def AdminView(page: ft.Page):
                         reporter_pseudo = report["reporter"]["pseudo"] if report.get("reporter") else "Anonyme"
                         date_str = format_date(datetime.fromisoformat(report["created_at"]))
 
+                        # Extraction sécurisée (évite un crash si le message a été supprimé de la BDD)
+                        message_content = report.get("message", {}).get("content", "Message introuvable") if report.get("message") else "Message introuvable"
+
                         reports_list.controls.append(
                             ft.Card(
                                 content=ft.ListTile(
                                     leading=ft.Icon(ft.Icons.WARNING_ROUNDED, color=ft.Colors.RED_400),
                                     title=ft.Text(f"Signalé : {reported_pseudo}", weight="bold"),
-                                    subtitle=ft.Column([ft.Text(f"Motif : {report['raison']}"), ft.Text(f"Par : {reporter_pseudo} le {date_str}", size=11, color=ft.Colors.OUTLINE)], spacing=2),
+                                    subtitle=ft.Column(
+                [
+                    ft.Text(f"Motif : {report['raison']}", weight="bold"),
+                    ft.Text(f"« {message_content} »", italic=True, color=ft.Colors.ON_SURFACE_VARIANT),
+                    ft.Text(f"Par : {reporter_pseudo} le {date_str}", size=11, color=ft.Colors.OUTLINE)
+                ], 
+                spacing=2
+            ),
                                     trailing=ft.Container(
                                         content=ft.Text(status_text, size=12, weight="bold", color=status_color),
                                         padding=ft.padding.symmetric(horizontal=10, vertical=5),
@@ -77,6 +87,7 @@ async def AdminView(page: ft.Page):
             page.update()
 
     async def open_resolve_dialog(report):
+        print("Cliqué")
         action_dropdown = ft.Dropdown(
             label="Action à prendre",
             options=[
@@ -154,7 +165,8 @@ async def AdminView(page: ft.Page):
             ),
             actions=[ft.TextButton("Annuler", on_click=lambda _: page.pop_dialog()), submit_btn],
         )
-        page.show_dialog(dlg)
+        await page.show_dialog(dlg)
+        page.update()
 
     # ==========================================================
     #                 LOGIQUE DES UTILISATEURS
@@ -222,7 +234,8 @@ async def AdminView(page: ft.Page):
                             label="Utilisateurs",
                             icon=ft.Icons.PEOPLE_ALT_ROUNDED,
                         ),
-                    ],tab_alignment=ft.TabAlignment.CENTER,
+                    ],
+                    tab_alignment=ft.TabAlignment.CENTER,
                 ),
                 # ==========================
                 #        CONTENU ONGLET
@@ -233,10 +246,7 @@ async def AdminView(page: ft.Page):
                         # -------- ONGLET SIGNALMENTS --------
                         ft.Stack(
                             expand=True,
-                            controls=[
-                                ft.Container(expand=True, content=reports_list),
-                                ft.Container(content=loading_ring, alignment=ft.Alignment.CENTER),
-                            ],
+                            controls=[ft.Container(expand=True, content=reports_list), loading_ring],
                         ),
                         # -------- ONGLET UTILISATEURS --------
                         users_list,

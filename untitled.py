@@ -13,6 +13,9 @@
 # - Désactiver l'auto scroll quand on remonte
 # - Mettre les messages en fil d'attente
 # - Charger plus que les 100 derniers messages
+# - Afficher le contenu du message dans la carte de signalement.
+# - Vérifier si l'utilisateur est banni à l'interieur de get_current_user
+# - débannir, bannir avec délai
 
 
 

@@ -199,6 +199,12 @@ class ReportCreateSchema(BaseModel):
     raison: str
 
 
+class MessageReportSchema(BaseModel):
+    content: str
+
+    model_config = {"from_attributes": True}
+
+
 class ReportResolutionSchema(BaseModel):
     """
     Payload pour résoudre un signalement avec une action concrète.
@@ -223,11 +229,10 @@ class ReportSchema(BaseModel):
     reported_id: Optional[int]
     message_id: Optional[int]
 
-    # class ConfigDict:
-    # 	from_attributes = True
-
-
-# ... Garde ReportFullSchema tel quel ...
+class BanUserSchema(BaseModel):
+    ban: bool # True pour bannir, False pour débannir
+    duration_hours: Optional[int] = None # None = Définitif
+    reason: Optional[str] = None
 
 
 class ReportStatusUpdate(BaseModel):
@@ -244,7 +249,9 @@ class ReportFullSchema(ReportSchema):
 
     reporter: Optional[UserMinimalSchema]
     reported: Optional[UserMinimalSchema]
+    message: Optional[MessageReportSchema] = None
     # On pourrait aussi inclure le contenu du message signalé si besoin
+    model_config = {"from_attributes": True}
 
     # class ConfigDict:
     # 	from_attributes = True

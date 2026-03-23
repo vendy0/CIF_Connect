@@ -514,6 +514,36 @@ def update_report_status(db: Session, report_id: int, new_status: str):
 		db.rollback()
 		raise HTTPException(status_code=500, detail="Erreur mise à jour signalement")
 
+def update_user_ban_status(db: Session, target_user_id: int, ban_data: BanUserSchema):
+    stmt = select(User).where(User.id == target_user_id)
+    user = db.execute(stmt).scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+
+    if ban_data.ban:
+        user.is_banned = True
+        user.ban_reason = ban_data.reason
+        if ban_data.duration_hours:
+            # Ban temporaire
+            user.ban_expires_at = datetime.now() + timedelta(hours=ban_data.duration_hours)
+        else:
+            # Ban définitif
+            user.ban_expires_at = None
+    else:
+        # Débannissement
+        user.is_banned = False
+        user.ban_expires_at = None
+        user.ban_reason = None
+
+    try:
+        db.commit()
+        db.refresh(user)
+        return user
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Erreur lors de la mise à jour du statut")
+
 
 # ==============================================================================
 # GESTION DES MESSAGES

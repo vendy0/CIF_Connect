@@ -107,6 +107,7 @@ def change_pseudo(
     return {"detail": "Pseudo modifié", "new_pseudo": user.pseudo}
 
 
+
 @app.get("/rooms/{room_id}/online", tags=["Rooms"])
 def get_online_members(room_id: int, db: Session = Depends(get_db)):
     # En supposant que `manager.active_connections` est un dict: { room_id: [websocket1, websocket2] }
@@ -118,6 +119,19 @@ def get_online_members(room_id: int, db: Session = Depends(get_db)):
 
     total_members = db_inter.count_room_members(db, room_id)
     return {"online_members": online_members, "total_members": total_members}
+
+
+@app.put("/users/{user_id}/ban", tags=["Users"])
+def toggle_ban_user(
+    user_id: int,
+    data: BanUserSchema,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(get_current_user)
+):
+    """Bannir ou débannir un utilisateur manuellement"""
+    # Note : Tu pourras rajouter une vérification ici pour t'assurer que current_user_id est bien admin
+    user = db_inter.update_user_ban_status(db, user_id, data)
+    return {"detail": "Statut mis à jour", "is_banned": user.is_banned}
 
 
 # ==============================================================================
