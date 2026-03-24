@@ -5,7 +5,7 @@ from typing import List
 from websocket_manager import manager
 
 # Import des modules locaux
-from database.models import SessionLocal, Message
+from database.models import SessionLocal, Message, User
 import database.crud as db_inter
 from database.shemas import *
 from security import create_access_token, verify_password, SECRET_KEY, ALGORITHM
@@ -25,28 +25,28 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 # ==============================================================================
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
-    try:
-        # 1. On tente de décoder le jeton avec notre SECRET_KEY
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
+# async def get_current_user(token: str = Depends(oauth2_scheme)):
+#     try:
+#         # 1. On tente de décoder le jeton avec notre SECRET_KEY
+#         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+#         user_id: str = payload.get("sub")
 
-        if user_id is None:
-            raise credentials_exception
-        try:
-            user_id = int(user_id)
-        except:
-            raise credentials_exception
-            return None
+#         if user_id is None:
+#             raise credentials_exception
+#         try:
+#             user_id = int(user_id)
+#         except:
+#             raise credentials_exception
+#             return None
 
-        return user_id  # On retourne l'ID pour que la route sache qui appelle
-    except JWTError as e:
-        print(e)
-        # Si le jeton est expiré ou falsifié, on lève une erreur 401
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Jeton invalide ou expiré",
-        )
+#         return user_id  # On retourne l'ID pour que la route sache qui appelle
+#     except JWTError as e:
+#         print(e)
+#         # Si le jeton est expiré ou falsifié, on lève une erreur 401
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="Jeton invalide ou expiré",
+#         )
 
 
 def get_db():
@@ -55,6 +55,33 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+# Ajoute 'Depends(get_db)' dans les paramètres de get_current_user
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+
+        user = db.query(User).filter(User.id == int(user_id)).first()
+        if not user:
+            raise credentials_exception
+
+        # VÉRIFICATION DU BANNISSEMENT EN TEMPS RÉEL
+        if user.is_banned:
+            if user.ban_expires_at and user.ban_expires_at < datetime.now():
+                # Le ban est terminé, on le lève
+                user.is_banned = False
+                user.ban_expires_at = None
+                db.commit()
+            else:
+                raise HTTPException(status_code=403, detail="Votre compte est banni.")
+
+        return int(user_id)
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Jeton invalide ou expiré")
 
 
 # ==============================================================================
@@ -70,20 +97,51 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+# @app.post("/login", response_model=Token, tags=["Users"])
+# def login(data: LoginRequest, db: Session = Depends(get_db)):
+#     """Authentification simple (Email + Password)"""
+#     user = db_inter.get_user_by_email(db, data.email)
+
+#     # Vérification (Attention: MDP en clair ici, à hasfer en prod !)
+#     if not user:
+#         raise HTTPException(status_code=401, detail="Utilisateur introuvable !")
+#     elif not verify_password(data.password, user.password):
+#         raise HTTPException(status_code=401, detail="Mot de passe incorrect !")
+
+#     if user.is_banned:
+#         raise HTTPException(status_code=403, detail="Compte banni.")
+#     # ... après avoir vérifié que l'utilisateur existe et que le MDP est bon ...
+#     access_token = create_access_token(data={"sub": str(user.id), "pseudo": user.pseudo, "role": user.role, "email": user.email})
+#     return {"access_token": access_token, "token_type": "bearer"}
+
+
+# Mise à jour de la fonction login pour le message détaillé
 @app.post("/login", response_model=Token, tags=["Users"])
 def login(data: LoginRequest, db: Session = Depends(get_db)):
-    """Authentification simple (Email + Password)"""
     user = db_inter.get_user_by_email(db, data.email)
 
-    # Vérification (Attention: MDP en clair ici, à hasfer en prod !)
     if not user:
         raise HTTPException(status_code=401, detail="Utilisateur introuvable !")
     elif not verify_password(data.password, user.password):
         raise HTTPException(status_code=401, detail="Mot de passe incorrect !")
 
     if user.is_banned:
-        raise HTTPException(status_code=403, detail="Compte banni.")
-    # ... après avoir vérifié que l'utilisateur existe et que le MDP est bon ...
+        # Vérification si le ban a expiré
+        if user.ban_expires_at and user.ban_expires_at < datetime.now():
+            user.is_banned = False
+            user.ban_expires_at = None
+            db.commit()
+        else:
+            # Calcul du temps restant
+            if user.ban_expires_at:
+                reste = user.ban_expires_at - datetime.now()
+                heures, rest = divmod(reste.total_seconds(), 3600)
+                minutes, _ = divmod(rest, 60)
+                msg = f"Banni pour {int(heures)}h et {int(minutes)}m. Motif: {user.ban_reason or 'Non spécifié'}"
+            else:
+                msg = f"Bannissement définitif. Motif: {user.ban_reason or 'Non spécifié'}"
+            raise HTTPException(status_code=403, detail=msg)
+
     access_token = create_access_token(data={"sub": str(user.id), "pseudo": user.pseudo, "role": user.role, "email": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -107,7 +165,6 @@ def change_pseudo(
     return {"detail": "Pseudo modifié", "new_pseudo": user.pseudo}
 
 
-
 @app.get("/rooms/{room_id}/online", tags=["Rooms"])
 def get_online_members(room_id: int, db: Session = Depends(get_db)):
     # En supposant que `manager.active_connections` est un dict: { room_id: [websocket1, websocket2] }
@@ -122,12 +179,7 @@ def get_online_members(room_id: int, db: Session = Depends(get_db)):
 
 
 @app.put("/users/{user_id}/ban", tags=["Users"])
-def toggle_ban_user(
-    user_id: int,
-    data: BanUserSchema,
-    db: Session = Depends(get_db),
-    current_user_id: int = Depends(get_current_user)
-):
+def toggle_ban_user(user_id: int, data: BanUserSchema, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user)):
     """Bannir ou débannir un utilisateur manuellement"""
     # Note : Tu pourras rajouter une vérification ici pour t'assurer que current_user_id est bien admin
     user = db_inter.update_user_ban_status(db, user_id, data)

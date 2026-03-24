@@ -1,6 +1,6 @@
 import flet as ft
 import httpx
-from utils import generer_pseudo, decode_token, host, port, api
+from utils import generer_pseudo, decode_token, host, port, api, show_top_toast
 from math import pi
 
 
@@ -15,8 +15,6 @@ async def LoginView(page: ft.Page):
 
     # Dans ton LoginView (Flet 0.80.5)
     storage = ft.SharedPreferences()
-
-
 
     async def login_success(token_data):
         # On stocke le jeton pour les prochaines fois
@@ -91,6 +89,7 @@ async def LoginView(page: ft.Page):
                     else:
                         error_detail = response.json().get("detail", "Erreur inconnue")
                         email_input.error = error_detail
+                        await show_top_toast(page, error_detail, True)
                         page.update()
 
                 # VRAIE erreur réseau (serveur éteint, pas de wifi, etc.)
@@ -110,6 +109,7 @@ async def LoginView(page: ft.Page):
     )
     password_input = ft.TextField(label="Mot de passe", prefix_icon=ft.Icons.LOCK, password=True, can_reveal_password=True, border_radius=10, multiline=False, on_submit=password_submit)
     confirm_password_input = ft.TextField(label="Confirmer le mot de passe", prefix_icon=ft.Icons.LOCK_OUTLINE, password=True, can_reveal_password=True, border_radius=10, on_submit=handle_submit)
+
     def build_form():
         if is_register_mode:
             title = "Créer un compte"

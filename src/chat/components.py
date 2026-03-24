@@ -171,14 +171,14 @@ class MyChatMessage(BaseChatMessage):
                 on_click=lambda e: self._page_ref.run_task(self.on_edit, e, self.message),
             )
             if (datetime.now() - timedelta(minutes=15)) < self.message.message_datetime
-            else ft.Container(),
+            else ft.Container(visible=False),
             ft.ListTile(
                 leading=ft.Icon(ft.Icons.DELETE_OUTLINE, color="error"),
                 title=ft.Text("Supprimer"),
                 on_click=lambda e: self._page_ref.run_task(self.on_delete, e, self.message),
             )
             if (datetime.now() - timedelta(days=3)) < self.message.message_datetime
-            else ft.Container(),
+            else ft.Container(visible=False),
             ft.ListTile(
                 leading=ft.Icon(ft.Icons.REPLY),
                 title=ft.Text("Répondre"),

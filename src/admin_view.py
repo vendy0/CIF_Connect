@@ -59,13 +59,13 @@ async def AdminView(page: ft.Page):
                                     leading=ft.Icon(ft.Icons.WARNING_ROUNDED, color=ft.Colors.RED_400),
                                     title=ft.Text(f"Signalé : {reported_pseudo}", weight="bold"),
                                     subtitle=ft.Column(
-                [
-                    ft.Text(f"Motif : {report['raison']}", weight="bold"),
-                    ft.Text(f"« {message_content} »", italic=True, color=ft.Colors.ON_SURFACE_VARIANT),
-                    ft.Text(f"Par : {reporter_pseudo} le {date_str}", size=11, color=ft.Colors.OUTLINE)
-                ], 
-                spacing=2
-            ),
+                                        [
+                                            ft.Text(f"Motif : {report['raison']}", weight="bold"),
+                                            ft.Text(f"« {message_content} »", italic=True, color=ft.Colors.ON_SURFACE_VARIANT),
+                                            ft.Text(f"Par : {reporter_pseudo} le {date_str}", size=11, color=ft.Colors.OUTLINE),
+                                        ],
+                                        spacing=2,
+                                    ),
                                     trailing=ft.Container(
                                         content=ft.Text(status_text, size=12, weight="bold", color=status_color),
                                         padding=ft.padding.symmetric(horizontal=10, vertical=5),
@@ -172,35 +172,185 @@ async def AdminView(page: ft.Page):
     #                 LOGIQUE DES UTILISATEURS
     # ==========================================================
 
+    # async def load_users():
+    #     try:
+    #         response = await api.get("/users")
+    #         if response.status_code == 200:
+    #             users = response.json()
+    #             users_list.controls.clear()
+
+    #             for user in users:
+    #                 is_banned = user.get("is_banned", False)
+    #                 badge_color = ft.Colors.RED if is_banned else ft.Colors.GREEN
+    #                 badge_text = "Banni" if is_banned else "Actif"
+    #                 role_icon = ft.Icons.ADMIN_PANEL_SETTINGS if user["role"] == "admin" else ft.Icons.PERSON
+
+    #                 users_list.controls.append(
+    #                     ft.ListTile(
+    #                         leading=ft.Icon(role_icon, color=ft.Colors.BLUE_400),
+    #                         title=ft.Text(user["pseudo"], weight="bold"),
+    #                         subtitle=ft.Text(user["email"], size=12),
+    #                         trailing=ft.Container(
+    #                             content=ft.Text(badge_text, size=11, color=badge_color, weight="bold"),
+    #                             border=ft.border.all(1, badge_color),
+    #                             border_radius=5,
+    #                             padding=ft.padding.symmetric(horizontal=8, vertical=2),
+    #                         ),
+    #                     )
+    #                 )
+    #             page.update()
+    #     except httpx.RequestError:
+    #         pass  # Erreur silencieuse gérée globalement
+
+    # async def load_users():
+    #     try:
+    #         response = await api.get("/users")
+    #         if response.status_code == 200:
+    #             users = response.json()
+    #             users_list.controls.clear()
+
+    #             for user in users:
+    #                 is_banned = user.get("is_banned", False)
+    #                 badge_color = ft.Colors.RED if is_banned else ft.Colors.GREEN
+    #                 badge_text = "Banni" if is_banned else "Actif"
+    #                 role_icon = ft.Icons.ADMIN_PANEL_SETTINGS if user["role"] == "admin" else ft.Icons.PERSON
+
+    #                 users_list.controls.append(
+    #                     ft.ListTile(
+    #                         leading=ft.Icon(role_icon, color=ft.Colors.BLUE_400),
+    #                         title=ft.Text(user["pseudo"], weight="bold"),
+    #                         subtitle=ft.Text(user["email"], size=12),
+    #                         trailing=ft.Container(
+    #                             content=ft.Text(badge_text, size=11, color=badge_color, weight="bold"),
+    #                             border=ft.border.all(1, badge_color),
+    #                             border_radius=5,
+    #                             padding=ft.padding.symmetric(horizontal=8, vertical=2),
+    #                         ),
+    #                         # On ajoute l'action au clic
+    #                         on_click=lambda e, u=user: page.run_task(open_user_ban_dialog, u),
+    #                     )
+    #                 )
+    #             page.update()
+    #     except httpx.RequestError:
+    #         pass
+
+    # Dans admin_view.py, modifie la section UTILISATEURS
+    all_users_data = []  # Stockage local des données
+
+    search_user_input = ft.TextField(
+        hint_text="Rechercher par pseudo ou email...", prefix_icon=ft.Icons.SEARCH, on_change=lambda e: filter_users(e.control.value), border_radius=10, height=45, content_padding=10
+    )
+
+    def render_users_list(users):
+        users_list.controls.clear()
+        for user in users:
+            is_banned = user.get("is_banned", False)
+            badge_color = ft.Colors.RED if is_banned else ft.Colors.GREEN
+            badge_text = "Banni" if is_banned else "Actif"
+            role_icon = ft.Icons.ADMIN_PANEL_SETTINGS if user["role"] == "admin" else ft.Icons.PERSON
+
+            users_list.controls.append(
+                ft.ListTile(
+                    leading=ft.Icon(role_icon, color=ft.Colors.BLUE_400),
+                    title=ft.Text(user["pseudo"], weight="bold"),
+                    subtitle=ft.Text(user["email"], size=12),
+                    trailing=ft.Container(
+                        content=ft.Text(badge_text, size=11, color=badge_color, weight="bold"),
+                        border=ft.border.all(1, badge_color),
+                        border_radius=5,
+                        padding=ft.padding.symmetric(horizontal=8, vertical=2),
+                    ),
+                    on_click=lambda e, u=user: page.run_task(open_user_ban_dialog, u),
+                )
+            )
+        page.update()
+
+    def filter_users(query: str):
+        query = query.lower()
+        filtered = [u for u in all_users_data if query in u["pseudo"].lower() or query in u["email"].lower()]
+        render_users_list(filtered)
+
     async def load_users():
+        nonlocal all_users_data
         try:
             response = await api.get("/users")
             if response.status_code == 200:
-                users = response.json()
-                users_list.controls.clear()
-
-                for user in users:
-                    is_banned = user.get("is_banned", False)
-                    badge_color = ft.Colors.RED if is_banned else ft.Colors.GREEN
-                    badge_text = "Banni" if is_banned else "Actif"
-                    role_icon = ft.Icons.ADMIN_PANEL_SETTINGS if user["role"] == "admin" else ft.Icons.PERSON
-
-                    users_list.controls.append(
-                        ft.ListTile(
-                            leading=ft.Icon(role_icon, color=ft.Colors.BLUE_400),
-                            title=ft.Text(user["pseudo"], weight="bold"),
-                            subtitle=ft.Text(user["email"], size=12),
-                            trailing=ft.Container(
-                                content=ft.Text(badge_text, size=11, color=badge_color, weight="bold"),
-                                border=ft.border.all(1, badge_color),
-                                border_radius=5,
-                                padding=ft.padding.symmetric(horizontal=8, vertical=2),
-                            ),
-                        )
-                    )
-                page.update()
+                all_users_data = response.json()
+                render_users_list(all_users_data)
         except httpx.RequestError:
-            pass  # Erreur silencieuse gérée globalement
+            pass
+
+    # # Ensuite, dans le TabBarView, tu remplaces `users_list` par une colonne contenant ta barre et la liste :
+    # ft.TabBarView(
+    #     expand=True,
+    #     controls=[
+    #         ft.Stack(expand=True, controls=[ft.Container(expand=True, content=reports_list), loading_ring]),
+    #         ft.Column([search_user_input, ft.Container(content=users_list, expand=True)], expand=True, padding=10),
+    #     ],
+    # ),
+
+    # --- NOUVELLE FONCTION À AJOUTER JUSTE AU-DESSUS DE load_users() ---
+    async def open_user_ban_dialog(user_data):
+        is_currently_banned = user_data.get("is_banned", False)
+
+        if is_currently_banned:
+            # --- LOGIQUE DE DÉBANNISSEMENT ---
+            async def submit_unban(e):
+                try:
+                    resp = await api.put(f"/users/{user_data['id']}/ban", data={"ban": False})
+                    if resp.status_code == 200:
+                        page.pop_dialog()
+                        await show_top_toast(page, f"{user_data['pseudo']} a été débanni.")
+                        await load_users()
+                    else:
+                        await show_top_toast(page, "Erreur lors du débannissement.", True)
+                except httpx.RequestError:
+                    await show_top_toast(page, "Erreur réseau.", True)
+
+            dlg = ft.AlertDialog(
+                title=ft.Text("Débannir l'utilisateur"),
+                content=ft.Text(f"Voulez-vous vraiment lever le bannissement de {user_data['pseudo']} ?"),
+                actions=[ft.TextButton("Annuler", on_click=lambda _: page.pop_dialog()), ft.ElevatedButton("Débannir", on_click=submit_unban, bgcolor=ft.Colors.GREEN, color=ft.Colors.WHITE)],
+            )
+            page.show_dialog(dlg)
+
+        else:
+            # --- LOGIQUE DE BANNISSEMENT ---
+            ban_duration_dropdown = ft.Dropdown(
+                label="Durée du bannissement",
+                options=[
+                    ft.dropdown.Option(key="1", text="1 Heure"),
+                    ft.dropdown.Option(key="24", text="24 Heures"),
+                    ft.dropdown.Option(key="168", text="7 Jours"),
+                    ft.dropdown.Option(key="720", text="30 Jours"),
+                    ft.dropdown.Option(key="0", text="Définitif"),
+                ],
+                width=400,
+                value="24",
+            )
+            ban_reason_input = ft.TextField(label="Motif du bannissement (Optionnel)", width=400)
+
+            async def submit_ban(e):
+                duration = int(ban_duration_dropdown.value) if ban_duration_dropdown.value != "0" else None
+                payload = {"ban": True, "duration_hours": duration, "reason": ban_reason_input.value}
+
+                try:
+                    resp = await api.put(f"/users/{user_data['id']}/ban", data=payload)
+                    if resp.status_code == 200:
+                        page.pop_dialog()
+                        await show_top_toast(page, f"{user_data['pseudo']} a été banni.")
+                        await load_users()
+                    else:
+                        await show_top_toast(page, "Erreur lors du bannissement.", True)
+                except httpx.RequestError:
+                    await show_top_toast(page, "Erreur réseau.", True)
+
+            dlg = ft.AlertDialog(
+                title=ft.Text(f"Bannir {user_data['pseudo']}"),
+                content=ft.Column([ban_duration_dropdown, ban_reason_input], tight=True, spacing=15),
+                actions=[ft.TextButton("Annuler", on_click=lambda _: page.pop_dialog()), ft.ElevatedButton("Bannir", on_click=submit_ban, bgcolor=ft.Colors.RED, color=ft.Colors.WHITE)],
+            )
+            page.show_dialog(dlg)
 
     # ==========================================================
     #                 CHARGEMENT INITIAL ET VUE
@@ -240,16 +390,12 @@ async def AdminView(page: ft.Page):
                 # ==========================
                 #        CONTENU ONGLET
                 # ==========================
+                # Ensuite, dans le TabBarView, tu remplaces `users_list` par une colonne contenant ta barre et la liste :
                 ft.TabBarView(
                     expand=True,
                     controls=[
-                        # -------- ONGLET SIGNALMENTS --------
-                        ft.Stack(
-                            expand=True,
-                            controls=[ft.Container(expand=True, content=reports_list), loading_ring],
-                        ),
-                        # -------- ONGLET UTILISATEURS --------
-                        users_list,
+                        ft.Stack(expand=True, controls=[ft.Container(expand=True, content=reports_list), loading_ring]),
+                        ft.Column([search_user_input, ft.Container(content=users_list, expand=True)], expand=True),
                     ],
                 ),
             ],

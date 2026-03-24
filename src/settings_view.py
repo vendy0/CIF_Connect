@@ -13,6 +13,20 @@ async def SettingsView(page: ft.Page):
     pseudo = await storage.get("user_pseudo")
     email = await storage.get("user_email")
 
+    # Dans SettingsView(page: ft.Page)
+    role = await storage.get("user_role")
+
+    # Création conditionnelle du bouton Admin
+    admin_tile = (
+        ft.ListTile(
+            leading=ft.Icon(ft.Icons.ADMIN_PANEL_SETTINGS, color=ft.Colors.RED_400),
+            title=ft.Text("Panneau d'administration", color=ft.Colors.RED_400, weight="bold"),
+            on_click=lambda _: page.run_task(page.push_route, "/admin"),
+        )
+        if role == "admin"
+        else ft.Container(visible=False)
+    )
+
     async def go_login(e):
         await storage.remove("cif_token")
         keys = await storage.get_keys("user")
@@ -150,6 +164,7 @@ async def SettingsView(page: ft.Page):
                 subtitle=ft.Text(email),
             ),
             ft.Divider(),
+            admin_tile,
             ft.TextButton("Déconnexion", icon=ft.Icons.LOGOUT, on_click=go_login),
             ft.TextButton("Retour", icon=ft.Icons.ARROW_BACK, on_click=lambda _: page.views.pop()),
         ],

@@ -78,7 +78,7 @@
 #         content=ft.Icon(ft.Icons.REPLY_ROUNDED, color=ft.Colors.PRIMARY)
 #     ),
 #     # C'est ici qu'est la magie : on bloque la disparition de l'élément !
-#     confirm_dismiss=self.handle_swipe_reply 
+#     confirm_dismiss=self.handle_swipe_reply
 # )
 
 # # Fonction à ajouter dans ta classe :
@@ -109,8 +109,8 @@
 # )
 
 
-# # 
-# # 
+# #
+# #
 # # Salut ! C'est une excellente feuille de route. Tu as une très bonne vision de ce que doit être une application de chat moderne.
 # # On va décortiquer ça point par point, en gardant en tête nos contraintes : Flet 0.80.5, l'optimisation pour mobile (.apk), et surtout les piliers de CIF Connect (notamment l'anonymat).
 # # Voici mon analyse et comment implémenter tout ça.
@@ -122,11 +122,11 @@
 # # app_bar = ft.AppBar(
 #     --- BOUTON RETOUR ---
 # #     leading=ft.IconButton(
-# #         icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED, 
+# #         icon=ft.Icons.ARROW_BACK_IOS_NEW_ROUNDED,
 # #         on_click=lambda _: page.go("/rooms") # Utilise page.go() pour la navigation Flet moderne
 # #     ),
 # #     leading_width=40,
-# #     
+# #
 #     --- TITRE CLIQUABLE (Pour les infos du salon) ---
 # #     title=ft.GestureDetector(
 # #         on_tap=lambda _: page.go(f"/room_info/{current_room_id}"), # On verra cette vue plus bas
@@ -135,7 +135,7 @@
 # #     center_title=False,
 # #     bgcolor="surface",
 # #     elevation=2,
-# #     
+# #
 #     --- MENU 3 POINTS ---
 # #     actions=[
 # #         ft.PopupMenuButton(
@@ -145,15 +145,15 @@
 #                 ft.PopupMenuItem(icon=ft.Icons.EDIT, text="Modifier le salon") if is_admin else None,
 # #                 ft.PopupMenuItem(), # Séparateur visuel (ligne)
 # #                 ft.PopupMenuItem(
-# #                     icon=ft.Icons.LOGOUT_ROUNDED, 
-# #                     text="Quitter le salon", 
+# #                     icon=ft.Icons.LOGOUT_ROUNDED,
+# #                     text="Quitter le salon",
 # #                     on_click=go_to_rooms # Ton ancienne fonction
 # #                 ),
 # #             ]
 # #         ),
 # #     ],
 # # )
-# # 
+# #
 # # 2. Le fond d'écran (Style WhatsApp)
 # # Flet permet de mettre une image en fond très facilement. Il te suffit d'envelopper ta chat_list dans un ft.Container avec une image en répétition.
 # # Note : Tu devras ajouter une petite image (ex: pattern.png) dans le dossier assets de ton projet.
@@ -168,13 +168,13 @@
 # #     image_fit=ft.ImageFit.CONTAIN,
 # #     image_opacity=0.05, # Très léger pour que ça s'adapte au mode sombre/clair sans gêner la lecture
 # # )
-# # 
+# #
 # # 3. Glisser pour répondre (Swipe to reply)
 # # C'est un super ajout UX. En Flet mobile, on utilise le contrôle ft.Dismissible. Normalement c'est fait pour "supprimer" en glissant, mais on va le tromper : on va intercepter le glissement, annuler la suppression, et déclencher ta fonction on_reply.
 # # Dans ta classe BaseChatMessage (ou au moment de créer la bulle), tu dois l'envelopper :
 # Exemple de structure simplifiée :
 # # bulle_de_chat = ft.Container(...) # Ta bulle actuelle
-# # 
+# #
 # # message_avec_swipe = ft.Dismissible(
 # #     key=str(self.message.id), # Obligatoire pour un Dismissible
 # #     content=bulle_de_chat,
@@ -186,9 +186,9 @@
 # #         content=ft.Icon(ft.Icons.REPLY_ROUNDED, color=ft.Colors.PRIMARY)
 # #     ),
 #     C'est ici qu'est la magie : on bloque la disparition de l'élément !
-# #     confirm_dismiss=self.handle_swipe_reply 
+# #     confirm_dismiss=self.handle_swipe_reply
 # # )
-# # 
+# #
 # # Fonction à ajouter dans ta classe :
 # # # async def handle_swipe_reply(self, e: ft.DismissibleConfirmDismissEvent):
 # #     On déclenche la réponse
@@ -231,7 +231,6 @@
 # Quelle est la prochaine étape que tu veux attaquer ensemble ? On peut configurer le ft.Dismissible pour le swipe-to-reply, ou bien créer le squelette de la vue "Infos du Salon" ?
 
 
-
 # C'est une excellente feuille de route. Ton code est déjà très bien structuré, ce qui rend ces ajouts tout à fait logiques pour une application de chat moderne.
 # On va aborder tes demandes une par une, avec la franchise que tu apprécies, et surtout en respectant strictement Flet 0.80.5.
 # 1. Ajouter le Scroll Button à la page (La correction)
@@ -248,8 +247,8 @@
 #                     controls=[
 #                         chat_container, # Ta liste avec le fond d'écran
 #                         ft.Container(
-#                             content=scroll_btn, 
-#                             bottom=10, 
+#                             content=scroll_btn,
+#                             bottom=10,
 #                             right=10
 #                         ) # Le bouton positionné en bas à droite
 #                     ],
@@ -342,17 +341,18 @@
 #     ], alignment=ft.MainAxisAlignment.CENTER, spacing=2),
 # )
 
-5. La page Info du Salon (room_info.py)
-Voici le fichier complet pour la vue d'information du salon. L'interface permet la modification si l'utilisateur est le créateur. Pour préserver le principe d'anonymat du collège, la liste des membres n'affichera que les pseudos générés aléatoirement, garantissant un environnement sécurisé.
-Crée un fichier room_info.py :
+# 5. La page Info du Salon (room_info.py)
+# Voici le fichier complet pour la vue d'information du salon. L'interface permet la modification si l'utilisateur est le créateur. Pour préserver le principe d'anonymat du collège, la liste des membres n'affichera que les pseudos générés aléatoirement, garantissant un environnement sécurisé.
+# Crée un fichier room_info.py :
 import flet as ft
 from utils import api, show_top_toast, get_avatar_color, COLORS_LOOKUP, get_initials
 import httpx
 
+
 async def RoomInfoView(page: ft.Page):
     room_id = page.session.store.get("current_room_id")
-    current_user_id = page.session.store.get("user_id") # Assure-toi de stocker ça au login
-    
+    current_user_id = page.session.store.get("user_id")  # Assure-toi de stocker ça au login
+
     if not room_id:
         await page.push_route("/rooms")
         return ft.View(route="/room_info")
@@ -365,7 +365,7 @@ async def RoomInfoView(page: ft.Page):
     name_field = ft.TextField(label="Nom du salon", read_only=True, border=ft.InputBorder.UNDERLINE)
     desc_field = ft.TextField(label="Description", read_only=True, multiline=True, border=ft.InputBorder.UNDERLINE)
     code_field = ft.TextField(label="Code d'invitation (Optionnel)", read_only=True, border=ft.InputBorder.UNDERLINE)
-    
+
     # Bouton de sauvegarde (Caché par défaut)
     save_btn = ft.ElevatedButton("Enregistrer les modifications", icon=ft.Icons.SAVE, visible=False)
 
@@ -376,42 +376,39 @@ async def RoomInfoView(page: ft.Page):
         try:
             # TODO: Il te faudra créer une route API GET /rooms/{room_id} dans ton crud.py
             # Pour l'instant, on simule ou on s'adapte à ce qui existe.
-            response = await api.get(f"/rooms") 
+            response = await api.get(f"/rooms")
             rooms = response.json()
-            
+
             for r in rooms:
                 if r["id"] == room_id:
                     room_data = r
                     break
-            
+
             if not room_data:
                 await show_top_toast(page, "Salon introuvable", True)
                 return
 
             # Vérification Admin
-            is_admin = (room_data.get("creator", {}).get("id") == current_user_id)
+            is_admin = room_data.get("creator", {}).get("id") == current_user_id
 
             # Remplissage de l'UI
             name_field.value = room_data["name"]
             desc_field.value = room_data["description"]
-            
+
             if is_admin:
                 name_field.read_only = False
                 desc_field.read_only = False
                 code_field.read_only = False
                 save_btn.visible = True
-            
+
             # Simulation d'affichage des membres (À relier à une route API qui liste les membres de la room)
-            members = [{"pseudo": "RapideRenard5"}, {"pseudo": "CalmeHibou42"}] # Exemple
-            
+            members = [{"pseudo": "RapideRenard5"}, {"pseudo": "CalmeHibou42"}]  # Exemple
+
             members_list.controls.clear()
             for m in members:
                 members_list.controls.append(
                     ft.ListTile(
-                        leading=ft.CircleAvatar(
-                            content=ft.Text(get_initials(m["pseudo"])),
-                            bgcolor=get_avatar_color(m["pseudo"], COLORS_LOOKUP)
-                        ),
+                        leading=ft.CircleAvatar(content=ft.Text(get_initials(m["pseudo"])), bgcolor=get_avatar_color(m["pseudo"], COLORS_LOOKUP)),
                         title=ft.Text(m["pseudo"], weight="bold"),
                     )
                 )
@@ -428,7 +425,7 @@ async def RoomInfoView(page: ft.Page):
             }
             # Appel API selon ton main.py: PUT /rooms/{room_id}?user_id={id}
             response = await api.put(f"/rooms/{room_id}?user_id={current_user_id}", data=payload)
-            
+
             if response.status_code == 200:
                 await show_top_toast(page, "Modifications enregistrées !")
                 page.session.store.set("current_room_name", name_field.value)
@@ -454,38 +451,33 @@ async def RoomInfoView(page: ft.Page):
                 content=ft.Column(
                     controls=[
                         # En-tête avec Icône
-                        ft.Row([
-                            ft.CircleAvatar(icon=ft.Icons.CHAT_BUBBLE, radius=40, bgcolor=ft.Colors.PRIMARY_CONTAINER, color=ft.Colors.ON_PRIMARY_CONTAINER)
-                        ], alignment=ft.MainAxisAlignment.CENTER),
+                        ft.Row(
+                            [ft.CircleAvatar(icon=ft.Icons.CHAT_BUBBLE, radius=40, bgcolor=ft.Colors.PRIMARY_CONTAINER, color=ft.Colors.ON_PRIMARY_CONTAINER)], alignment=ft.MainAxisAlignment.CENTER
+                        ),
                         ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
-                        
                         # Formulaire
                         name_field,
                         desc_field,
                         code_field,
-                        
                         ft.Container(content=save_btn, alignment=ft.alignment.center, margin=ft.margin.only(top=10, bottom=20)),
-                        
                         # Section Membres
                         ft.Text(f"Membres", size=18, weight="bold", color=ft.Colors.PRIMARY),
-                        ft.Text("30 en ligne / 126", size=12, color=ft.Colors.GREEN), # À rendre dynamique via WebSockets
+                        ft.Text("30 en ligne / 126", size=12, color=ft.Colors.GREEN),  # À rendre dynamique via WebSockets
                         ft.Container(
                             content=members_list,
                             border=ft.border.all(1, ft.Colors.OUTLINE_VARIANT),
                             border_radius=10,
-                        )
+                        ),
                     ],
                     scroll=ft.ScrollMode.AUTO,
                 ),
                 padding=20,
-                expand=True
+                expand=True,
             )
-        ]
+        ],
     )
 
-N'oublie pas d'ajouter cette vue dans la gestion de tes routes (route_change) dans ton main.py frontal pour que page.push_route(f"/room_info/{current_room_id}") fonctionne !
-
-
+    # N'oublie pas d'ajouter cette vue dans la gestion de tes routes (route_change) dans ton main.py frontal pour que page.push_route(f"/room_info/{current_room_id}") fonctionne !
 
     # # Plus besoin de dictionnaire, on stocke la tâche asynchrone directement
     # scroll_timer_task = None
@@ -524,3 +516,63 @@ N'oublie pas d'ajouter cette vue dans la gestion de tes routes (route_change) da
     #         # On coupe le timer en cours
     #         if scroll_timer_task and not scroll_timer_task.done():
     #             scroll_timer_task.cancel()
+
+    # Dans admin_view.py, modifie la section UTILISATEURS
+    all_users_data = [] # Stockage local des données
+
+    search_user_input = ft.TextField(
+        hint_text="Rechercher par pseudo ou email...",
+        prefix_icon=ft.Icons.SEARCH,
+        on_change=lambda e: filter_users(e.control.value),
+        border_radius=10,
+        height=45,
+        content_padding=10
+    )
+
+    def render_users_list(users):
+        users_list.controls.clear()
+        for user in users:
+            is_banned = user.get("is_banned", False)
+            badge_color = ft.Colors.RED if is_banned else ft.Colors.GREEN
+            badge_text = "Banni" if is_banned else "Actif"
+            role_icon = ft.Icons.ADMIN_PANEL_SETTINGS if user["role"] == "admin" else ft.Icons.PERSON
+
+            users_list.controls.append(
+                ft.ListTile(
+                    leading=ft.Icon(role_icon, color=ft.Colors.BLUE_400),
+                    title=ft.Text(user["pseudo"], weight="bold"),
+                    subtitle=ft.Text(user["email"], size=12),
+                    trailing=ft.Container(
+                        content=ft.Text(badge_text, size=11, color=badge_color, weight="bold"),
+                        border=ft.border.all(1, badge_color),
+                        border_radius=5,
+                        padding=ft.padding.symmetric(horizontal=8, vertical=2),
+                    ),
+                    on_click=lambda e, u=user: page.run_task(open_user_ban_dialog, u),
+                )
+            )
+        page.update()
+
+    def filter_users(query: str):
+        query = query.lower()
+        filtered = [u for u in all_users_data if query in u["pseudo"].lower() or query in u["email"].lower()]
+        render_users_list(filtered)
+
+    async def load_users():
+        nonlocal all_users_data
+        try:
+            response = await api.get("/users")
+            if response.status_code == 200:
+                all_users_data = response.json()
+                render_users_list(all_users_data)
+        except httpx.RequestError:
+            pass
+
+    # Ensuite, dans le TabBarView, tu remplaces `users_list` par une colonne contenant ta barre et la liste :
+    ft.TabBarView(
+        expand=True,
+        controls=[
+            ft.Stack(expand=True, controls=[ft.Container(expand=True, content=reports_list), loading_ring]),
+            ft.Column([search_user_input, ft.Container(content=users_list, expand=True)], expand=True, padding=10),
+        ],
+    ),
