@@ -378,7 +378,7 @@ async def refresh_rooms(page, storage):
 	try:
 		response = await api.get("/user/rooms")
 
-		if response.status_code == 401:
+		if response.status_code in [401,403]:
 			await storage.remove("cif_token")
 			await page.push_route("/login")
 			return

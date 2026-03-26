@@ -67,7 +67,7 @@ async def RoomsView(page: ft.Page):
         try:
             response = await api.get("/user/rooms")
 
-            if response.status_code == 401:
+            if response.status_code in [400,401,402,403]:
                 await storage.remove("cif_token")
                 await page.push_route("/login")
                 return

@@ -517,62 +517,44 @@ async def RoomInfoView(page: ft.Page):
     #         if scroll_timer_task and not scroll_timer_task.done():
     #             scroll_timer_task.cancel()
 
-    # Dans admin_view.py, modifie la section UTILISATEURS
-    all_users_data = [] # Stockage local des données
+    is_loading_history = False
+    oldest_message_id = None
 
-    search_user_input = ft.TextField(
-        hint_text="Rechercher par pseudo ou email...",
-        prefix_icon=ft.Icons.SEARCH,
-        on_change=lambda e: filter_users(e.control.value),
-        border_radius=10,
-        height=45,
-        content_padding=10
-    )
+    async def load_older_messages():
+        nonlocal is_loading_history, oldest_message_id
+        if is_loading_history or not oldest_message_id:
+            return
+        is_loading_history = True
 
-    def render_users_list(users):
-        users_list.controls.clear()
-        for user in users:
-            is_banned = user.get("is_banned", False)
-            badge_color = ft.Colors.RED if is_banned else ft.Colors.GREEN
-            badge_text = "Banni" if is_banned else "Actif"
-            role_icon = ft.Icons.ADMIN_PANEL_SETTINGS if user["role"] == "admin" else ft.Icons.PERSON
+        # Appelle ton API en passant before_id
+        response = await api.get(f"/room/{current_room_id}/messages?before_id={oldest_message_id}")
+        if response.status_code == 200:
+            older_messages = response.json()
+            if older_messages:
+                # 1. Sauvegarde du premier ID actuel pour le recentrage du scroll
+                first_current_id = chat_list.controls[0].message.id if hasattr(chat_list.controls[0], "message") else None
 
-            users_list.controls.append(
-                ft.ListTile(
-                    leading=ft.Icon(role_icon, color=ft.Colors.BLUE_400),
-                    title=ft.Text(user["pseudo"], weight="bold"),
-                    subtitle=ft.Text(user["email"], size=12),
-                    trailing=ft.Container(
-                        content=ft.Text(badge_text, size=11, color=badge_color, weight="bold"),
-                        border=ft.border.all(1, badge_color),
-                        border_radius=5,
-                        padding=ft.padding.symmetric(horizontal=8, vertical=2),
-                    ),
-                    on_click=lambda e, u=user: page.run_task(open_user_ban_dialog, u),
-                )
-            )
+                oldest_message_id = older_messages[0]["id"]  # Mise à jour du plus vieux
+
+                # 2. Construction des bulles et insertion au début de la liste (index 0)
+                # (Crée tes objets MyChatMessage / OtherChatMessage ici et fais chat_list.controls.insert(0, bulle))
+
+                # Optionnel : recentrer la vue sans saut brusque si tu as beaucoup de texte
+                if first_current_id:
+                    page.run_task(chat_list.scroll_to, scroll_key=str(first_current_id), duration=0)
+
+        is_loading_history = False
         page.update()
 
-    def filter_users(query: str):
-        query = query.lower()
-        filtered = [u for u in all_users_data if query in u["pseudo"].lower() or query in u["email"].lower()]
-        render_users_list(filtered)
+    def handle_scroll(e: ft.OnScrollEvent):
+        # Si on s'approche tout en haut de la liste (ex: moins de 50 pixels)
+        if e.pixels < 50:
+            page.run_task(load_older_messages)
 
-    async def load_users():
-        nonlocal all_users_data
-        try:
-            response = await api.get("/users")
-            if response.status_code == 200:
-                all_users_data = response.json()
-                render_users_list(all_users_data)
-        except httpx.RequestError:
-            pass
-
-    # Ensuite, dans le TabBarView, tu remplaces `users_list` par une colonne contenant ta barre et la liste :
-    ft.TabBarView(
+    chat_list = ft.ListView(
         expand=True,
-        controls=[
-            ft.Stack(expand=True, controls=[ft.Container(expand=True, content=reports_list), loading_ring]),
-            ft.Column([search_user_input, ft.Container(content=users_list, expand=True)], expand=True, padding=10),
-        ],
-    ),
+        spacing=15,
+        auto_scroll=False,  # Très important: auto_scroll = False pour ne pas forcer le bas
+        padding=10,
+        on_scroll=handle_scroll,  # Ajout du listener
+    )

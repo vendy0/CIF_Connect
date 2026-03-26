@@ -26,6 +26,30 @@ async def fetch_room_messages(page, room_id):
         return None
 
 
+async def fetch_old_room_messages(page, room_id, oldest_message_id):
+    """
+    Récupère la liste des anciens messages d'un salon.
+    Gère les erreurs 401 et les erreurs réseau.
+    """
+    try:
+        response = await api.get(f"/room/{room_id}/messages?before_id={oldest_message_id}")
+
+        if response.status_code in [401, 403]:
+            await show_top_toast(page, "La session a expiré !", True)
+            await page.push_route("/login")
+            return None
+
+        if response.status_code != 200:
+            await show_top_toast(page, "Erreur lors de la récupération", True)
+            return None
+
+        return response.json()
+
+    except httpx.RequestError:
+        await show_top_toast(page, "Erreur réseau !", True)
+        return None
+
+
 async def mark_room_messages_as_read(page, room_id, last_message_id):
     """
     Informe le serveur que l'utilisateur a lu les messages de ce salon jusqu'à cet ID.

@@ -53,7 +53,7 @@ async def main(page: ft.Page):
 
         api.set_token(token)
 
-        await page.push_route("/admin")
+        await page.push_route("/rooms")
     else:
         await page.push_route("/login")
 

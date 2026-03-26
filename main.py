@@ -270,9 +270,9 @@ def quit_room(room_id: int, user_id: int = Depends(get_current_user), db: Sessio
 
 
 @app.get("/room/{room_id}/messages", response_model=List[MessageSchema], tags=["Messages"])
-def read_messages(room_id: int, current_user_id: int = Depends(get_current_user), db: Session = Depends(get_db)):
+def read_messages(room_id: int, before_id: int = None, current_user_id: int = Depends(get_current_user), db: Session = Depends(get_db)):
     """Lire l'historique d'un salon. Si l'utilisateur n'est pas dans le salon on restreind l'accès."""
-    return db_inter.get_messages(db, room_id, current_user_id)
+    return db_inter.get_messages(db, room_id, current_user_id, before_id)
 
 
 @app.post(

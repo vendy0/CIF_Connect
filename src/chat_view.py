@@ -5,7 +5,7 @@ from datetime import datetime, date, time, timedelta
 import httpx
 from chat.components import MyChatMessage, OtherChatMessage, SystemMessage
 from chat.models import Message
-from chat.api import fetch_room_messages, post_reaction, post_message_background, mark_room_messages_as_read
+from chat.api import fetch_room_messages, post_reaction, post_message_background, mark_room_messages_as_read, fetch_old_room_messages
 from chat.dialogs import show_edit_dialog, show_delete_dialog, show_report_dialog, show_quit_dialog
 from utils import get_initials, get_avatar_color, get_colors, show_top_toast, format_date, copy_message
 import json
@@ -69,28 +69,13 @@ async def ChatView(page: ft.Page):
     if not token:
         await page.push_route("/login")
 
-    chat_list = ft.ListView(expand=True, spacing=15, auto_scroll=True, padding=10)
+    def handle_scroll(e: ft.OnScrollEvent):
+        # # Si on s'approche tout en haut de la liste (ex: moins de 50 pixels)
+        # if e.pixels < 50:
+        #     page.run_task(load_older_messages)
+        pass
 
-    # # 1. Création du container principal avec le Loader initial
-    # chm = ft.Container(
-    # 	content=ft.ProgressRing(),  # Ton loader
-    # 	expand=True,
-    # 	alignment=ft.Alignment.CENTER,
-    # )
-
-    async def refresh_ui():
-        # 1. Récupérer les nouveaux messages via ton module API
-        updated_messages = await fetch_room_messages(page, current_room_id)
-
-        if updated_messages is not None:
-            # 2. Vider la liste visuelle (ListView)
-            chat_list.controls.clear()
-
-            # 3. Relancer l'affichage (réutilise ta fonction show_messages existante)
-            await show_messages(updated_messages, first_load=False)
-
-            # 4. Mettre à jour l'interface
-            page.update()
+    chat_list = ft.ListView(expand=True, spacing=15, auto_scroll=True, padding=10, on_scroll=handle_scroll)
 
     chat_container = ft.Container(
         content=ft.ProgressRing(),
@@ -108,10 +93,12 @@ async def ChatView(page: ft.Page):
 
     # On récupère les messages
     messages_received = None
+    is_loading_history = False
+    oldest_message_id = None
 
     # 2. On définit la fonction de chargement
     async def load_initial_data():
-        nonlocal messages_received
+        nonlocal messages_received, oldest_message_id
         # Appel à ton nouveau fichier API
         messages_received = await fetch_room_messages(page, current_room_id)
 
@@ -125,6 +112,7 @@ async def ChatView(page: ft.Page):
         for m in messages_received:
             if m["message_type"] == "chat":
                 is_chat_message = True
+                oldest_message_id = m["id"]
                 break
 
         if not is_chat_message:
@@ -166,6 +154,36 @@ async def ChatView(page: ft.Page):
             ],
         ),
     )
+
+    # On charge de nouveaux messages
+
+    async def load_older_messages():
+        nonlocal is_loading_history, oldest_message_id
+        if is_loading_history or not oldest_message_id:
+            return
+        is_loading_history = True
+
+        # Appelle ton API en passant before_id
+        response = await fetch_old_room_messages(page, current_room_id, oldest_message_id)
+        if not response:
+            return
+
+        older_messages = response.json()
+        if older_messages:
+            # 1. Sauvegarde du premier ID actuel pour le recentrage du scroll
+            first_current_id = chat_list.controls[0].message.id if hasattr(chat_list.controls[0], "message") else None
+
+            oldest_message_id = older_messages[0]["id"]  # Mise à jour du plus vieux
+
+            # 2. Construction des bulles et insertion au début de la liste (index 0)
+            # (Crée tes objets MyChatMessage / OtherChatMessage ici et fais chat_list.controls.insert(0, bulle))
+
+            # Optionnel : recentrer la vue sans saut brusque si tu as beaucoup de texte
+            if first_current_id:
+                page.run_task(chat_list.scroll_to, scroll_key=str(first_current_id), duration=0)
+
+        is_loading_history = False
+        page.update()
 
     new_message = ft.TextField(
         hint_text="Écrivez un message...", capitalization=ft.TextCapitalization.SENTENCES, autofocus=False, expand=True, multiline=True, min_lines=1, max_lines=5, border_radius=20
@@ -244,27 +262,6 @@ async def ChatView(page: ft.Page):
 
         await show_delete_dialog(page, msg.id, on_success=on_delete_done)
 
-    # 	async def send_click(e):
-    # 		if not new_message.value.strip():
-    # 			return
-
-    # 		parent_id = replying_to_message.id if replying_to_message else None
-    # 		await cancel_reply(None)
-    # 		page.update()
-
-    # 		message = await post_message_background(page, current_room_id, parent_id, new_message)
-    # 		if not message:
-    # 			return
-
-    # 		if chat_container.content != chat_list:
-    # 			chat_container.content = chat_list
-    # 			chat_container.alignment = None
-    # 			page.update()
-
-    # 		message_datetime = datetime.strptime(message["created_at"], "%Y-%m-%dT%H:%M:%S")
-    # 		message_date = message_datetime.date()
-    # 		message_time = message_datetime.time()
-
     async def send_click(e):
         content = new_message.value.strip()
         if not content:
@@ -299,6 +296,7 @@ async def ChatView(page: ft.Page):
 
         # 3. Affichage immédiat
         on_message(temp_msg, is_me=True)
+        page.update()
         page.run_task(chat_list.scroll_to, offset=-1, duration=300)
 
         # 4. Tâche d'envoi en arrière-plan
@@ -351,7 +349,6 @@ async def ChatView(page: ft.Page):
                         message=message, page=page, on_copy=copy_message, on_reply=prepare_reply, on_edit=edit_message, on_report=report_message, on_react=react_to_message, on_delete=delete_message
                     )
                 )
-        page.update()
 
     async def show_messages(messages_received, first_load=False):
         nonlocal chat_list, last_date, current_room_id, last_read_id
