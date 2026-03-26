@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload, aliased
 from sqlalchemy.exc import IntegrityError
 from database.models import User, Room, Message, Reaction, user_room, Report
 from database.shemas import *
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from datetime import datetime, timedelta
 from security import get_password_hash, verify_password
 
@@ -17,6 +17,13 @@ def verify_user_room(db: Session, user_id: int, room_id: int):
         return False
     return True
 
+
+# 1. Définissez l'exception ici (généralement après vos imports)
+credentials_exception = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="Could not validate credentials",
+    headers={"WWW-Authenticate": "Bearer"},
+)
 
 # ==============================================================================
 # GESTION DES UTILISATEURS
@@ -551,43 +558,96 @@ def update_user_ban_status(db: Session, target_user_id: int, ban_data: BanUserSc
 # ==============================================================================
 
 
+# def get_messages(db: Session, room_id: int, user_id: int, before_id: int):
+#     if not verify_user_room(db, user_id, room_id):
+#         raise HTTPException(status_code=401, detail="Vous ne faites pas partie de ce salon !")
+#     try:
+#         # On définit un alias pour le message parent pour pouvoir récupérer son auteur
+#         ParentMessage = aliased(Message)
+#         ParentAuthor = aliased(User)
+
+#         # On utilise select(Message) pour récupérer des objets complets
+#         stmt = (
+#             select(Message)
+#             .options(
+#                 joinedload(Message.author),  # Charge l'auteur du message actuel
+#                 selectinload(Message.reactions).joinedload(Reaction.user),
+#                 # ICI : On charge le parent ET l'auteur du parent
+#                 joinedload(Message.parent).joinedload(Message.author),
+#             )
+#             .where(Message.room_id == room_id, Message.message_type != "delete")
+#             .options(joinedload(Message.parent))  # <--- AJOUTE CECI
+#             .order_by(Message.created_at.desc())
+#             .limit(50)
+#         )
+
+#         # Filtre crucial pour la pagination
+#         if before_id:
+#             stmt = stmt.where(Message.id < before_id)
+
+#         # On prend les 50 derniers, classés par le plus récent d'abord, puis on les retourne à l'endroit en Python
+#         # stmt = stmt.order_by(Message.created_at.desc()).limit(50)
+#         results = db.execute(stmt).scalars().all()
+#         results.reverse()
+
+#         # Transformation manuelle pour injecter les infos du parent dans le schéma
+#         # (Si tes schémas Pydantic ne le font pas automatiquement via les relations)
+#         for msg in results:
+#             if msg.parent:
+#                 # On "attache" dynamiquement ces infos pour que Pydantic les voit
+#                 msg.parent_content = msg.parent.content
+#                 msg.parent_author = msg.parent.author.pseudo if msg.parent.author else "Inconnu"
+#             else:
+#                 msg.parent_content = None
+#                 msg.parent_author = None
+
+#         return results
+#     except Exception as e:
+#         print(f"Erreur get_messages: {e}")
+#         raise HTTPException(status_code=500, detail="Impossible de récupérer les messages")
+
+
 def get_messages(db: Session, room_id: int, user_id: int, before_id: int):
     if not verify_user_room(db, user_id, room_id):
         raise HTTPException(status_code=401, detail="Vous ne faites pas partie de ce salon !")
     try:
-        # On définit un alias pour le message parent pour pouvoir récupérer son auteur
+        # 1. Calcul dynamique de la limite (Non lus + offset de 100)
+        fetch_limit = 50
+
+        # On ne calcule l'offset que si c'est le chargement initial (pas de before_id)
+        if not before_id:
+            ur = db.execute(select(user_room).where(user_room.c.user_id == user_id, user_room.c.room_id == room_id)).first()
+            last_read = getattr(ur, "last_read_message_id", 0) if ur else 0
+
+            if last_read > 0:
+                unread_count = db.execute(select(func.count(Message.id)).where(Message.room_id == room_id, Message.id > last_read)).scalar() or 0
+                # On s'assure de prendre au moins 50 messages, ou le total non lu + 100
+                fetch_limit = max(50, unread_count + 100)
+
         ParentMessage = aliased(Message)
         ParentAuthor = aliased(User)
 
-        # On utilise select(Message) pour récupérer des objets complets
         stmt = (
             select(Message)
             .options(
-                joinedload(Message.author),  # Charge l'auteur du message actuel
+                joinedload(Message.author),
                 selectinload(Message.reactions).joinedload(Reaction.user),
-                # ICI : On charge le parent ET l'auteur du parent
                 joinedload(Message.parent).joinedload(Message.author),
             )
             .where(Message.room_id == room_id, Message.message_type != "delete")
-            .options(joinedload(Message.parent))  # <--- AJOUTE CECI
-            .order_by(Message.created_at.desc())
-            .limit(50)
+            # 2. Correction cruciale du tri : En cas d'égalité du timestamp, le plus grand ID passe en premier
+            .order_by(Message.created_at.desc(), Message.id.desc())
+            .limit(fetch_limit)
         )
 
-        # Filtre crucial pour la pagination
         if before_id:
             stmt = stmt.where(Message.id < before_id)
 
-        # On prend les 50 derniers, classés par le plus récent d'abord, puis on les retourne à l'endroit en Python
-        # stmt = stmt.order_by(Message.created_at.desc()).limit(50)
         results = db.execute(stmt).scalars().all()
         results.reverse()
 
-        # Transformation manuelle pour injecter les infos du parent dans le schéma
-        # (Si tes schémas Pydantic ne le font pas automatiquement via les relations)
         for msg in results:
             if msg.parent:
-                # On "attache" dynamiquement ces infos pour que Pydantic les voit
                 msg.parent_content = msg.parent.content
                 msg.parent_author = msg.parent.author.pseudo if msg.parent.author else "Inconnu"
             else:
