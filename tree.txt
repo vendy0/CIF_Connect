@@ -1,0 +1,83 @@
+.
+├── API
+│   ├── cif_connect_demo.db
+│   └── fil_attente.py
+├── __pycache__
+│   ├── main.cpython-312.pyc
+│   ├── security.cpython-312.pyc
+│   └── websocket_manager.cpython-312.pyc
+├── autres...
+│   ├── client.py
+│   ├── fil_attente.py
+│   ├── flet_icons.txt
+│   ├── pyproject.toml
+│   ├── readme.md
+│   ├── server.py
+│   └── server_client.py
+├── cif_connect_demo.db
+├── cif_connect_demo.db-shm
+├── cif_connect_demo.db-wal
+├── database
+│   ├── __pycache__
+│   │   ├── crud.cpython-312.pyc
+│   │   ├── models.cpython-312.pyc
+│   │   └── shemas.cpython-312.pyc
+│   ├── crud.py
+│   ├── models.py
+│   ├── seed_messages.py
+│   └── shemas.py
+├── fix_indent.py
+├── main.py
+├── pyproject.toml
+├── requirements.txt
+├── security.py
+├── src
+│   ├── __pycache__
+│   │   ├── admin_view.cpython-312.pyc
+│   │   ├── chat_view.cpython-312.pyc
+│   │   ├── create_room_view.cpython-312.pyc
+│   │   ├── login_view.cpython-312.pyc
+│   │   ├── room_info_view.cpython-312.pyc
+│   │   ├── rooms_view.cpython-312.pyc
+│   │   ├── settings_view.cpython-312.pyc
+│   │   └── utils.cpython-312.pyc
+│   ├── admin_view.py
+│   ├── assets
+│   │   ├── icon.png
+│   │   ├── logo.png
+│   │   ├── logo_1.png
+│   │   ├── logo_2.png
+│   │   ├── pattern.png
+│   │   ├── pattern.svg
+│   │   └── splash_android.png
+│   ├── big_modifs.py
+│   ├── chat
+│   │   ├── __pycache__
+│   │   │   ├── api.cpython-312.pyc
+│   │   │   ├── components.cpython-312.pyc
+│   │   │   ├── dialogs.cpython-312.pyc
+│   │   │   └── models.cpython-312.pyc
+│   │   ├── api.py
+│   │   ├── components.py
+│   │   ├── dialogs.py
+│   │   └── models.py
+│   ├── chat_view.py
+│   ├── create_room_view.py
+│   ├── ft_cols.json
+│   ├── login_view.py
+│   ├── main.py
+│   ├── pseudos.json
+│   ├── room_info_view.py
+│   ├── rooms_view.py
+│   ├── settings_view.py
+│   └── utils.py
+├── test.py
+├── test2.py
+├── tree.txt
+├── ttt.json
+├── ttt.py
+├── untitled.py
+├── websocket_manager.py
+└── x.py
+
+11 directories, 70 files
