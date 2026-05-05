@@ -23,6 +23,13 @@ async def ChatView(page: ft.Page):
     storage = ft.SharedPreferences()
     token = await storage.get("cif_token")
     last_date = None
+    is_chat_message = False
+
+    loading = ft.Container(
+        content=ft.ProgressRing(width=20, height=20, stroke_width=2, color="white"),
+        alignment=ft.Alignment.CENTER,
+        width=80,  # On fixe une largeur pour éviter que le bouton ne rétrécisse trop
+    )
 
     def build_empty_chat_view():
         return ft.Container(
@@ -51,7 +58,7 @@ async def ChatView(page: ft.Page):
             ),
             alignment=ft.Alignment.CENTER,
             expand=True,
-            padding=ft.padding.only(top=200),
+            padding=ft.Padding.only(top=200),
         )
 
     current_room_id = page.session.store.get("current_room_id") or 1
@@ -78,7 +85,7 @@ async def ChatView(page: ft.Page):
     chat_list = ft.ListView(expand=True, spacing=15, auto_scroll=True, padding=10, on_scroll=handle_scroll)
 
     chat_container = ft.Container(
-        content=ft.ProgressRing(),
+        content=loading,
         alignment=ft.Alignment.CENTER,
         expand=True,
         image=ft.DecorationImage(
@@ -98,6 +105,7 @@ async def ChatView(page: ft.Page):
 
     # 2. On définit la fonction de chargement
     async def load_initial_data():
+        nonlocal is_chat_message
         nonlocal messages_received, oldest_message_id
         # Appel à ton nouveau fichier API
         messages_received = await fetch_room_messages(page, current_room_id)
@@ -108,7 +116,6 @@ async def ChatView(page: ft.Page):
             await page.push_route("/rooms")
             return
 
-        is_chat_message = False
         for m in messages_received:
             if m["message_type"] == "chat":
                 is_chat_message = True
@@ -135,7 +142,7 @@ async def ChatView(page: ft.Page):
         visible=False,
         bgcolor="surfacevariant",
         padding=10,
-        border_radius=ft.border_radius.only(top_left=15, top_right=15),
+        border_radius=ft.BorderRadius.only(top_left=15, top_right=15),
         content=ft.Row(
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             controls=[
@@ -258,11 +265,15 @@ async def ChatView(page: ft.Page):
         async def on_delete_done():
             # On filtre la liste pour enlever le message id
             chat_list.controls = [m for m in chat_list.controls if not (hasattr(m, "message") and m.message.id == msg.id)]
+            chat_is_empty = len(chat_list.controls) == 0
+            if chat_is_empty:
+                chat_container.content = build_empty_chat_view()
             page.update()
 
         await show_delete_dialog(page, msg.id, on_success=on_delete_done)
 
     async def send_click(e):
+        nonlocal is_chat_message
         content = new_message.value.strip()
         if not content:
             return
@@ -294,7 +305,11 @@ async def ChatView(page: ft.Page):
             pending=True,  # <--- Activer le loader
         )
 
-        # 3. Affichage immédiat
+        # 3. Suprression du fond Affichage immédiat
+        if not is_chat_message:
+            chat_container.content = chat_list
+            page.update()
+
         on_message(temp_msg, is_me=True)
         page.update()
         page.run_task(chat_list.scroll_to, offset=-1, duration=300)
@@ -411,7 +426,7 @@ async def ChatView(page: ft.Page):
                                 ft.Divider(expand=True, color=ft.Colors.RED_400),
                             ]
                         ),
-                        margin=ft.margin.symmetric(vertical=10),
+                        margin=ft.Margin.symmetric(vertical=10),
                         key=f"unread_{last_read_id}",  # Une clé unique pour le saut
                     )
                     chat_list.controls.append(unread_divider)
@@ -424,9 +439,9 @@ async def ChatView(page: ft.Page):
                         content=ft.Text(format_date(message_date).upper(), size=11, weight="bold", color=ft.Colors.OUTLINE),
                         alignment=ft.Alignment.CENTER,
                         bgcolor=ft.Colors.with_opacity(0.1, ft.Colors.ON_SURFACE_VARIANT),
-                        padding=ft.padding.symmetric(horizontal=12, vertical=4),
+                        padding=ft.Padding.symmetric(horizontal=12, vertical=4),
                         border_radius=10,
-                        margin=ft.margin.symmetric(vertical=10),
+                        margin=ft.Margin.symmetric(vertical=10),
                     )
 
                     chat_list.controls.append(date_divider)

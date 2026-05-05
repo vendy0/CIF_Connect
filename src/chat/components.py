@@ -32,7 +32,7 @@ class SystemMessage(ft.Row):
                     spacing=5,
                 ),
                 bgcolor="surfacecontainerhighest",  # Syntaxe sécurisée
-                padding=ft.padding.symmetric(horizontal=12, vertical=6),
+                padding=ft.Padding.symmetric(horizontal=12, vertical=6),
                 border_radius=15,
             )
         ]
@@ -66,7 +66,7 @@ class BaseChatMessage(ft.Row):
 
         # --- NOUVEAU : Icône de statut ---
         self.status_icon = ft.Container(
-            content=ft.ProgressRing(width=10, height=10, stroke_width=2) if self.message.pending else ft.Icon(ft.Icons.CHECK, size=12, color=ft.Colors.OUTLINE), margin=ft.margin.only(left=5)
+            content=ft.ProgressRing(width=10, height=10, stroke_width=2) if self.message.pending else ft.Icon(ft.Icons.CHECK, size=12, color=ft.Colors.OUTLINE), margin=ft.Margin.only(left=5)
         )
 
         # --- NOUVEAU : Ligne de temps regroupée ---
@@ -86,11 +86,11 @@ class BaseChatMessage(ft.Row):
                     ],
                     spacing=2,
                 ),
-                padding=ft.padding.all(8),
+                padding=ft.Padding.all(8),
                 bgcolor=ft.Colors.with_opacity(0.1, ft.Colors.BLACK),
                 border_radius=5,
-                border=ft.border.only(left=ft.BorderSide(3, ft.Colors.BLUE_400)),
-                margin=ft.margin.only(bottom=5),
+                border=ft.Border.only(left=ft.BorderSide(3, ft.Colors.BLUE_400)),
+                margin=ft.Margin.only(bottom=5),
                 # on_click=lambda _: self._page_ref.run_task(self.scroll_to_parent, self.message.parent_id),  # <-- On commente ça pour l'instant pour éviter un crash !
             )
 
@@ -206,7 +206,7 @@ class MyChatMessage(BaseChatMessage):
                 ),
                 bgcolor=ft.Colors.PRIMARY_CONTAINER,  # Couleur différente pour nos messages
                 padding=10,
-                border_radius=ft.border_radius.only(top_left=15, top_right=0, bottom_left=15, bottom_right=15),
+                border_radius=ft.BorderRadius.only(top_left=15, top_right=0, bottom_left=15, bottom_right=15),
                 width=200,
                 # on_click=lambda _: self.show_menu(),
             ),
@@ -350,7 +350,7 @@ class OtherChatMessage(BaseChatMessage):
                 ),
                 bgcolor=color,
                 padding=10,
-                border_radius=ft.border_radius.only(top_left=0, top_right=15, bottom_left=15, bottom_right=15),
+                border_radius=ft.BorderRadius.only(top_left=0, top_right=15, bottom_left=15, bottom_right=15),
                 width=200,
                 # on_click=lambda _: self.show_menu(),
             ),

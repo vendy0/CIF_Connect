@@ -53,7 +53,7 @@ async def RoomsView(page: ft.Page):
 
     room_list = ft.ListView(expand=True, spacing=2, padding=10)
 
-    info_text = ft.Text("Chargement des salons...", size=14, margin=ft.margin.only(bottom=20), color=ft.Colors.GREY_500)
+    info_text = ft.Text("Chargement des salons...", size=14, margin=ft.Margin.only(bottom=20), color=ft.Colors.GREY_500)
     container_principal = ft.Container(
         content=ft.ProgressRing(),  # Loader initial
         expand=True,

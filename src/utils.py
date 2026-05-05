@@ -271,7 +271,7 @@ class Room:
 			content=ft.Text(str(unread_count), size=10, color=ft.Colors.WHITE, weight="bold"),
 			bgcolor=ft.Colors.GREEN_500,
 			border_radius=10,
-			padding=ft.padding.symmetric(horizontal=6, vertical=2),
+			padding=ft.Padding.symmetric(horizontal=6, vertical=2),
 			visible=unread_count > 0,  # Caché si 0 non-lu
 		)
 
@@ -344,7 +344,7 @@ async def show_top_toast(page: ft.Page, message: str, is_error: bool = False):
 	toast = ft.Container(
 		content=ft.Text(message, color=ft.Colors.WHITE, weight="bold"),
 		bgcolor=color,
-		padding=ft.padding.symmetric(horizontal=20, vertical=10),
+		padding=ft.Padding.symmetric(horizontal=20, vertical=10),
 		border_radius=30,
 		top=20,  # Affichage en haut
 		right=20,  # On l'aligne en haut à droite (ou retire 'right' et gère l'alignement pour centrer)

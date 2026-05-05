@@ -7,6 +7,16 @@ from json import loads, dumps
 async def CreateRoomView(page: ft.Page):
 	storage = ft.SharedPreferences()
 
+	loading = ft.Container(
+		content=ft.ProgressRing(width=20, height=20, stroke_width=2, color="white"),
+		alignment=ft.Alignment.CENTER,
+		width=80,  # On fixe une largeur pour éviter que le bouton ne rétrécisse trop
+	)
+
+	join_room_text = "Entrer dans le salon"
+
+	create_room_text = "Créer le salon"
+
 	# ==========================================================
 	#                         STATE
 	# ==========================================================
@@ -62,7 +72,7 @@ async def CreateRoomView(page: ft.Page):
 			code_input.error = "Champ obligatoire."
 			page.update()
 		try:
-			join_room_button.content = ft.ProgressRing()
+			join_room_button.content = loading
 			join_room_button.icon = None
 
 			response = await api.post("/user/rooms/join", data={"access_key": code})
@@ -82,10 +92,11 @@ async def CreateRoomView(page: ft.Page):
 			await show_top_toast(page, "Erreur réseau !", True)
 		finally:
 			join_room_button.icon = ft.Icons.LOGIN
-			join_room_button.content = "Entrer dans le salon"
+			join_room_button.content = join_room_text
 		page.update()
 
 	async def creer_room(e):
+		nonlocal loading
 		name = room_name_input.value.strip()
 		desc = room_description_input.value.strip()
 
@@ -98,7 +109,7 @@ async def CreateRoomView(page: ft.Page):
 			room_description_input.error = "Champ obligatoire."
 
 		if name and desc:
-			create_room_button.content = ft.ProgressRing()
+			create_room_button.content = loading
 			create_room_button.icon = None
 			token = await storage.get("cif_token")
 			if not token:
@@ -135,7 +146,7 @@ async def CreateRoomView(page: ft.Page):
 				room_description_input.error = "Serveur injoignable"
 				page.update()
 			finally:
-				create_room_button.content = "Créer le salon"
+				create_room_button.content = create_room_text
 				create_room_button.icon = ft.Icons.ADD_HOME_WORK
 
 		page.update()
@@ -155,7 +166,7 @@ async def CreateRoomView(page: ft.Page):
 	)
 
 	create_room_button = ft.ElevatedButton(
-		content="Créer le salon",
+		content=create_room_text,
 		width=400,
 		height=50,
 		icon=ft.Icons.ADD_HOME_WORK,
@@ -163,7 +174,7 @@ async def CreateRoomView(page: ft.Page):
 	)
 
 	join_room_button = ft.ElevatedButton(
-		content="Entrer dans le salon",
+		content=join_room_text,
 		width=350,
 		height=50,
 		icon=ft.Icons.LOGIN,
