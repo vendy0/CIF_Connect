@@ -103,37 +103,72 @@ async def ChatView(page: ft.Page):
     is_loading_history = False
     oldest_message_id = None
 
-    # 2. On définit la fonction de chargement
     async def load_initial_data():
-        nonlocal is_chat_message
-        nonlocal messages_received, oldest_message_id
-        # Appel à ton nouveau fichier API
+        nonlocal messages_received, oldest_message_id, is_chat_message
         messages_received = await fetch_room_messages(page, current_room_id)
 
         if messages_received is None:
-            # Si erreur (401 ou réseau), api.py a déjà fait le toast
-            # On redirige explicitement ici si ce n'est pas déjà fait
             await page.push_route("/rooms")
             return
 
-        for m in messages_received:
-            if m["message_type"] == "chat":
-                is_chat_message = True
-                oldest_message_id = m["id"]
-                break
+        is_chat_message = any(m["message_type"] == "chat" for m in messages_received)
+        if not is_chat_message:
+            oldest_message_id = None
+        else:
+            oldest_message_id = next((m["id"] for m in messages_received if m["message_type"] == "chat"), None)
 
         if not is_chat_message:
-            # Cas où il n'y a aucun message
             chat_container.content = build_empty_chat_view()
-            page.update()
         else:
-            # Cas où il y a des messages
             await show_messages(messages_received, first_load=True)
             chat_container.content = chat_list
-            # On retire l'alignement center pour que la liste commence en haut
             chat_container.alignment = None
-            page.update()
-        # Si tout est OK, on affiche
+
+        page.update()
+
+        # Attendre que Flet ait rendu les contrôles avant de scroller
+        await asyncio.sleep(0.15)
+
+        if last_read_id and last_read_id != 0:
+            # Scroll vers le séparateur "Nouveaux messages"
+            await chat_list.scroll_to(scroll_key=f"unread_{last_read_id}", duration=200)
+        else:
+            # Scroll tout en bas (conversation sans non-lus)
+            await chat_list.scroll_to(offset=-1, duration=0)
+
+        page.update()
+
+    # 2. On définit la fonction de chargement
+    # async def load_initial_data():
+    #     nonlocal is_chat_message
+    #     nonlocal messages_received, oldest_message_id
+    #     # Appel à ton nouveau fichier API
+    #     messages_received = await fetch_room_messages(page, current_room_id)
+
+    #     if messages_received is None:
+    #         # Si erreur (401 ou réseau), api.py a déjà fait le toast
+    #         # On redirige explicitement ici si ce n'est pas déjà fait
+    #         await page.push_route("/rooms")
+    #         return
+
+    #     for m in messages_received:
+    #         if m["message_type"] == "chat":
+    #             is_chat_message = True
+    #             oldest_message_id = m["id"]
+    #             break
+
+    #     if not is_chat_message:
+    #         # Cas où il n'y a aucun message
+    #         chat_container.content = build_empty_chat_view()
+    #         page.update()
+    #     else:
+    #         # Cas où il y a des messages
+    #         await show_messages(messages_received, first_load=True)
+    #         chat_container.content = chat_list
+    #         # On retire l'alignement center pour que la liste commence en haut
+    #         chat_container.alignment = None
+    #         page.update()
+    # Si tout est OK, on affiche
 
     # 3. On lance le chargement SANS bloquer l'affichage de la vue
     page.run_task(load_initial_data)
@@ -169,28 +204,26 @@ async def ChatView(page: ft.Page):
         if is_loading_history or not oldest_message_id:
             return
         is_loading_history = True
+        try:
+            older_messages = await fetch_old_room_messages(page, current_room_id, oldest_message_id)
+            if not older_messages:
+                return
+            # older_messages est déjà une liste, plus besoin de .json()
+            if older_messages:
+                oldest_message_id = older_messages[0]["id"]
 
-        # Appelle ton API en passant before_id
-        response = await fetch_old_room_messages(page, current_room_id, oldest_message_id)
-        if not response:
-            return
+                # 1. Sauvegarde du premier ID actuel pour le recentrage du scroll
+                first_current_id = chat_list.controls[0].message.id if hasattr(chat_list.controls[0], "message") else None
 
-        older_messages = response.json()
-        if older_messages:
-            # 1. Sauvegarde du premier ID actuel pour le recentrage du scroll
-            first_current_id = chat_list.controls[0].message.id if hasattr(chat_list.controls[0], "message") else None
+                # Optionnel : recentrer la vue sans saut brusque si tu as beaucoup de texte
+                if first_current_id:
+                    page.run_task(chat_list.scroll_to, scroll_key=str(first_current_id), duration=0)
+                # ... traitement des messages
+        finally:
+            is_loading_history = False  # ✅ toujours réinitialisé
+            page.update()
 
-            oldest_message_id = older_messages[0]["id"]  # Mise à jour du plus vieux
 
-            # 2. Construction des bulles et insertion au début de la liste (index 0)
-            # (Crée tes objets MyChatMessage / OtherChatMessage ici et fais chat_list.controls.insert(0, bulle))
-
-            # Optionnel : recentrer la vue sans saut brusque si tu as beaucoup de texte
-            if first_current_id:
-                page.run_task(chat_list.scroll_to, scroll_key=str(first_current_id), duration=0)
-
-        is_loading_history = False
-        page.update()
 
     new_message = ft.TextField(
         hint_text="Écrivez un message...", capitalization=ft.TextCapitalization.SENTENCES, autofocus=False, expand=True, multiline=True, min_lines=1, max_lines=5, border_radius=20
@@ -208,13 +241,22 @@ async def ChatView(page: ft.Page):
         reply_banner.content.controls[0].controls[1].value = ""
         page.update()
 
+    # async def prepare_reply(msg: Message):
+    #     nonlocal replying_to_message
+    #     await new_message.focus()
+    #     replying_to_message = msg
+    #     reply_banner.visible = True
+    #     reply_banner.content.controls[0].controls[1].value = f"{msg.pseudo}: {msg.content[:30]}..."
+    #     page.update()
+
     async def prepare_reply(msg: Message):
         nonlocal replying_to_message
-        await new_message.focus()
         replying_to_message = msg
         reply_banner.visible = True
         reply_banner.content.controls[0].controls[1].value = f"{msg.pseudo}: {msg.content[:30]}..."
         page.update()
+        # Focus lancé sans bloquer — pas d'await ici
+        page.run_task(new_message.focus)
 
     async def edit_message(e, msg: Message):
         page.pop_dialog()
@@ -314,29 +356,51 @@ async def ChatView(page: ft.Page):
         page.update()
         page.run_task(chat_list.scroll_to, offset=-1, duration=300)
 
-        # 4. Tâche d'envoi en arrière-plan
-        async def background_task(msg_content, p_id, t_id):
-            from chat.api import post_message_background  # Assure-toi de l'importer
+        # # 4. Tâche d'envoi en arrière-plan
+        # async def background_task(msg_content, p_id, t_id):
+        #     from chat.api import post_message_background  # Assure-toi de l'importer
 
-            real_data = await post_message_background(page, current_room_id, p_id, msg_content)
+        #     real_data = await post_message_background(page, current_room_id, p_id, msg_content)
 
-            # Si le composant ChatList est toujours actif (l'utilisateur n'a pas quitté l'app)
-            # if chat_list.page:
-            if real_data:
-                # Succès : on trouve le message temporaire et on le valide
-                for ctrl in chat_list.controls:
-                    if hasattr(ctrl, "message") and getattr(ctrl.message, "temp_id", None) == t_id:
-                        ctrl.message.id = real_data["id"]  # Vrai ID de la BDD
-                        ctrl.message.pending = False
-                        ctrl.message.temp_id = None
-                        if hasattr(ctrl, "update_status"):
-                            ctrl.update_status()
-                        break
-            else:
-                # Échec : on supprime le message fantôme et on prévient
+        #     # Si le composant ChatList est toujours actif (l'utilisateur n'a pas quitté l'app)
+        #     # if chat_list.page:
+        #     if real_data:
+        #         # Succès : on trouve le message temporaire et on le valide
+        #         for ctrl in chat_list.controls:
+        #             if hasattr(ctrl, "message") and getattr(ctrl.message, "temp_id", None) == t_id:
+        #                 ctrl.message.id = real_data["id"]  # Vrai ID de la BDD
+        #                 ctrl.message.pending = False
+        #                 ctrl.message.temp_id = None
+        #                 if hasattr(ctrl, "update_status"):
+        #                     ctrl.update_status()
+        #                 break
+        #     else:
+        #         # Échec : on supprime le message fantôme et on prévient
+        #         chat_list.controls = [c for c in chat_list.controls if not (hasattr(c, "message") and getattr(c.message, "temp_id", None) == t_id)]
+        #         page.update()
+        #         await show_top_toast(page, "Erreur réseau, message non envoyé !", True)
+
+    async def background_task(msg_content, p_id, t_id):
+        real_data = await post_message_background(page, current_room_id, p_id, msg_content)
+
+        if real_data:
+            for ctrl in chat_list.controls:
+                if hasattr(ctrl, "message") and getattr(ctrl.message, "temp_id", None) == t_id:
+                    ctrl.message.id = real_data["id"]
+                    ctrl.message.pending = False
+                    ctrl.message.temp_id = None
+                    if hasattr(ctrl, "update_status"):
+                        ctrl.update_status()
+                    break
+        else:
+            # ✅ Vérifier si le WS a déjà confirmé le message
+            temp_still_pending = any(hasattr(c, "message") and getattr(c.message, "temp_id", None) == t_id for c in chat_list.controls)
+            if temp_still_pending:
+                # Vrai échec : supprimer la bulle et prévenir
                 chat_list.controls = [c for c in chat_list.controls if not (hasattr(c, "message") and getattr(c.message, "temp_id", None) == t_id)]
                 page.update()
                 await show_top_toast(page, "Erreur réseau, message non envoyé !", True)
+            # else : le WS a déjà tout géré, on ne fait rien
 
         # Lancement sans bloquer
         page.run_task(background_task, content, parent_id, temp_id)
@@ -480,8 +544,7 @@ async def ChatView(page: ft.Page):
         # On remplace le titre par l'input, et on change les boutons
         if app_bar.title == search_input:
             # Annuler la recherche
-            app_bar.title = ft.Row(controls=ft.Text(current_room_name, size=20, weight="bold"))
-            app_bar.actions = [default_menu]
+            app_bar.title = ft.Row(controls=[ft.Text(current_room_name, size=20, weight="bold")])  # ✅            app_bar.actions = [default_menu]
             filter_messages("")  # On réaffiche tout
         else:
             # Activer la recherche

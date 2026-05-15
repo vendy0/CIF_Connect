@@ -142,11 +142,16 @@ class BaseChatMessage(ft.Row):
 
     # Fonction à ajouter dans ta classe :
     async def handle_swipe_reply(self, e: ft.DismissibleDismissEvent):
-        # On déclenche la réponse
-        await self.on_reply(self.message)
+        # 1. Libérer Flutter IMMÉDIATEMENT — c'est ce qui débloq l'UI
         await e.control.confirm_dismiss(False)
-        # On renvoie False pour que le message revienne à sa place (il n'est pas supprimé)
-        return False
+        # 2. Seulement ensuite, déclencher l'action (non bloquant)
+        self._page_ref.run_task(self.on_reply, self.message)
+    # async def handle_swipe_reply(self, e: ft.DismissibleDismissEvent):
+    #     # On déclenche la réponse
+    #     await self.on_reply(self.message)
+    #     await e.control.confirm_dismiss(False)
+    #     # On renvoie False pour que le message revienne à sa place (il n'est pas supprimé)
+    #     return False
 
     async def pass_func(self, e):
         pass

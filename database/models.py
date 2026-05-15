@@ -34,8 +34,8 @@ engine = create_engine(f"sqlite:///{DB_FILENAME}", echo=False, future=True, conn
 def enable_foreign_keys_configure_sqlite(dbapi_connection, connection_record):
 	cursor = dbapi_connection.cursor()
 	cursor.execute("PRAGMA foreign_keys=ON")
-	cursor.execute("PRAGMA journal_mode=WAL")  # <-- LA MAGIE EST ICI
-	cursor.execute("PRAGMA synchronous=NORMAL")  # <-- BOOSTE LA VITESSE
+# 	cursor.execute("PRAGMA journal_mode=WAL")  # <-- LA MAGIE EST ICI
+# 	cursor.execute("PRAGMA synchronous=NORMAL")  # <-- BOOSTE LA VITESSE
 	cursor.execute("PRAGMA busy_timeout = 5000")
 	cursor.close()
 

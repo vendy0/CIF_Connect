@@ -331,9 +331,6 @@ async def delete_message(message_id: int, user_id: int = Depends(get_current_use
     msg = db_inter.delete_message_func(db, message_id, user_id)
     if msg:
         room_id = msg.room_id
-        # 2. Suppression BDD
-        db_inter.delete_message_func(db, message_id, user_id)
-
         # 3. Diffusion WebSocket avec action "delete"
         await manager.broadcast_to_room(room_id, {"action": "delete", "id": message_id})
         await manager.broadcast_global({"action": "refresh_rooms"})
